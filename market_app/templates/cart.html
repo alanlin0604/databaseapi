@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的購物車 - 小明線上市場</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+    <nav class="bg-blue-600 p-4 text-white shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold">🛒 我的購物車</h1>
+            <a href="/" class="hover:underline">← 返回首頁購物</a>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-6">
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="border-b">
+                        <th class="py-4">商品圖片</th>
+                        <th class="py-4">商品名稱</th>
+                        <th class="py-4">單價</th>
+                        <th class="py-4">數量</th>
+                        <th class="py-4">小計</th>
+                        <th class="py-4">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="cart-items">
+                    </tbody>
+            </table>
+
+            <div class="mt-8 flex justify-end items-center space-x-6">
+                <div class="text-right">
+                    <p class="text-gray-600">總金額：</p>
+                    <p id="total-price" class="text-3xl font-bold text-red-600">$0</p>
+                </div>
+                <button onclick="checkout()" class="bg-green-600 text-white px-8 py-3 rounded-lg font-bold hover:bg-green-700 shadow-lg">
+                    前往結帳
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "http://127.0.0.1:8000/api";
+
+        async function fetchCart() {
+            try {
+                // 1. 先抓取購物車內容
+                const cartRes = await fetch(`${API_BASE}/cart/`);
+                const cartData = await cartRes.json();
+                
+                // 2. 抓取所有商品資訊（為了顯示商品名稱和價格）
+                const prodRes = await fetch(`${API_BASE}/products/`);
+                const products = await prodRes.json();
+
+                const container = document.getElementById('cart-items');
+                container.innerHTML = '';
+                let total = 0;
+
+                cartData.forEach(item => {
+                    const product = products.find(p => p.id === item.product);
+                    if (product) {
+                        const subtotal = product.price * item.quantity;
+                        total += subtotal;
+
+                        container.innerHTML += `
+                            <tr class="border-b hover:bg-gray-50">
+                                <td class="py-4"><img src="${product.image_url || 'https://via.placeholder.com/80'}" class="w-16 h-16 object-cover rounded"></td>
+                                <td class="py-4 font-bold text-gray-800">${product.name}</td>
+                                <td class="py-4 text-gray-600">$${product.price}</td>
+                                <td class="py-4">${item.quantity}</td>
+                                <td class="py-4 text-red-600 font-bold">$${subtotal}</td>
+                                <td class="py-4">
+                                    <button onclick="deleteItem(${item.id})" class="text-red-500 hover:underline">刪除</button>
+                                </td>
+                            </tr>
+                        `;
+                    }
+                });
+
+                document.getElementById('total-price').innerText = `$${total}`;
+            } catch (error) {
+                console.error("載入購物車失敗:", error);
+            }
+        }
+
+        async function deleteItem(itemId) {
+            if (confirm('確定要刪除這項商品嗎？')) {
+                await fetch(`${API_BASE}/cart/${itemId}/`, { method: 'DELETE' });
+                fetchCart(); // 重新整理
+            }
+        }
+
+        function checkout() {
+            alert('結帳功能正在開發中！(下個步驟將串接訂單系統)');
+        }
+
+        window.onload = fetchCart;
+    </script>
+</body>
+</html>

@@ -1,10 +1,8 @@
-# online_market_site/urls.py (專案層級)
-
 from django.contrib import admin
 from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    # 這裡將 '/api/' 路徑導向 market_app/urls.py
-    path('api/', include('market_app.urls')), 
+    # 這行是關鍵！它會把 market_app 裡所有的路由（包含首頁和 API）拉進來
+    path('', include('market_app.urls')), 
 ]
