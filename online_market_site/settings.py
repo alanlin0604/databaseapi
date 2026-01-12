@@ -10,6 +10,9 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import dj_database_url
+import os
+
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -88,20 +91,12 @@ WSGI_APPLICATION = 'online_market_site.wsgi.application'
 # online_market_site/online_market_site/settings.py
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',  # 告訴 Django 使用 MySQL
-        'NAME': 'online_market_db',            # 您的資料庫名稱 (必須已在 MySQL 中創建)
-        'USER': 'root',             # 您的 MySQL 使用者名稱 (例如: root)
-        'PASSWORD': '00001234',     # 您的 MySQL 密碼
-        'HOST': '127.0.0.1',                   # 資料庫主機地址 (如果是本機，通常是 127.0.0.1)
-        'PORT': '3306',                        # MySQL 埠號 (預設是 3306)
-
-        # 建議的編碼設定
-        'OPTIONS': {
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-            'charset': 'utf8mb4',
-        }
-    }
+    'default': dj_database_url.config(
+        # 如果環境變數中沒有 DATABASE_URL (即本地開發)，則預設使用 SQLite
+        # 這樣您在本地測試時就不需要啟動 MySQL
+        default='sqlite:///db.sqlite3',
+        conn_max_age=600
+    )
 }
 
 
