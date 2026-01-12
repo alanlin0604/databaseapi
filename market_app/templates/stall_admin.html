@@ -17,26 +17,29 @@
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
         /* 狀態標籤樣式 */
-        .status-badge-received { background-color: #fef3c7; color: #d97706; } /* 備貨中：橘黃 */
-        .status-badge-ready { background-color: #dcfce7; color: #16a34a; }    /* 可取貨：綠色 */
-        .status-badge-completed { background-color: #f1f5f9; color: #64748b; } /* 已取貨：灰色 */
+        .status-badge-received { background-color: #fef3c7; color: #d97706; } /* 備貨中 */
+        .status-badge-ready { background-color: #dcfce7; color: #16a34a; }    /* 可取貨 */
+        .status-badge-completed { background-color: #f1f5f9; color: #64748b; } /* 已取貨 */
+        
+        body { font-family: 'PingFang TC', 'Heiti TC', 'Microsoft JhengHei', sans-serif; }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen text-slate-800 font-sans text-base"> <nav class="bg-slate-900 text-white shadow-2xl sticky top-0 z-50">
-        <div class="container mx-auto px-6 py-5 flex justify-between items-center"> <div class="flex items-center space-x-4">
+<body class="bg-slate-50 min-h-screen text-slate-800 font-sans text-base">
+
+    <nav class="bg-slate-900 text-white shadow-2xl sticky top-0 z-50">
+        <div class="container mx-auto px-6 py-5 flex justify-between items-center">
+            <div class="flex items-center space-x-4">
                 <div class="bg-blue-600 p-2.5 rounded-xl shadow-inner text-xl">🏪</div>
-                <h1 class="text-xl font-black tracking-tighter">營運管理中心</h1> </div>
+                <h1 class="text-xl font-black tracking-tighter">營運管理中心</h1>
+            </div>
             <div class="flex items-center space-x-6">
                 <span id="live-time" class="text-sm font-mono text-slate-400 hidden md:block"></span>
-                <a href="/" class="text-base font-bold bg-white/10 hover:bg-white/20 px-6 py-2.5 rounded-full transition-all">
-                    返回前台
-                </a>
+                <a href="/" class="text-base font-bold bg-white/10 hover:bg-white/20 px-6 py-2.5 rounded-full transition-all">返回前台</a>
             </div>
         </div>
     </nav>
 
     <div class="container mx-auto p-6 lg:p-10">
-        
         <div class="flex space-x-4 mb-10 bg-slate-200/50 p-2 rounded-2xl w-fit backdrop-blur-md">
             <button onclick="switchTab('dashboard')" id="tab-dashboard" class="px-7 py-3 rounded-xl font-bold transition-all text-base text-slate-500 hover:text-slate-800">數據概覽</button>
             <button onclick="switchTab('products')" id="tab-products" class="px-7 py-3 rounded-xl font-bold transition-all text-base text-slate-500 hover:text-slate-800">庫存商品</button>
@@ -45,29 +48,29 @@
         </div>
 
         <div id="dashboard-section" class="space-y-8">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8"> <div class="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 relative overflow-hidden group">
-                    <p class="text-slate-400 text-sm font-black uppercase tracking-widest">今日成交</p> <h2 id="stat-today-revenue" class="text-5xl font-black text-slate-900 mt-3">$0</h2> <p class="text-xs text-green-500 font-bold mt-3">● 即時更新中</p>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
+                    <p class="text-slate-400 text-sm font-black uppercase tracking-widest">今日成交</p>
+                    <h2 id="stat-today-revenue" class="text-5xl font-black text-slate-900 mt-3">$0</h2>
+                    <p class="text-xs text-green-500 font-bold mt-3">● 即時更新中</p>
                 </div>
-                <div class="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 relative overflow-hidden group">
+                <div class="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
                     <p class="text-slate-400 text-sm font-black uppercase tracking-widest">累計營收</p>
                     <h2 id="stat-total-revenue" class="text-5xl font-black text-slate-900 mt-3">$0</h2>
                 </div>
-                <div class="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 relative overflow-hidden group">
+                <div class="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
                     <p class="text-slate-400 text-sm font-black uppercase tracking-widest">待處理訂單</p>
                     <h2 id="stat-pending-orders" class="text-5xl font-black text-blue-600 mt-3">0</h2>
                 </div>
             </div>
-
             <div class="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-12">
                 <h3 class="text-2xl font-black text-slate-900 mb-10">熱銷排行榜</h3>
-                <div id="top-products-list" class="space-y-6">
-                    <p class="text-slate-400 italic text-base">尚未有銷售數據</p>
-                </div>
+                <div id="top-products-list" class="space-y-6"></div>
             </div>
         </div>
 
         <div id="products-section" class="hidden space-y-8">
-            <div class="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-10 flex flex-col md:flex-row justify-between items-center">
+            <div class="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-10 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                     <h2 class="text-3xl font-black text-slate-900">庫存商品清單</h2>
                     <p class="text-slate-500 text-base mt-2">管理架上商品與即時庫存數量</p>
@@ -132,36 +135,37 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="col-span-2">
                         <label class="block text-xs font-bold text-slate-400 mb-3 uppercase">品名</label>
-                        <input type="text" id="p-name" required class="w-full px-6 py-4 rounded-2xl border text-lg">
+                        <input type="text" id="p-name" required class="w-full px-6 py-4 rounded-2xl border text-lg focus:border-blue-500 outline-none">
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-400 mb-3 uppercase">售價 ($)</label>
-                        <input type="number" id="p-price" required class="w-full px-6 py-4 rounded-2xl border text-lg">
+                        <input type="number" id="p-price" required class="w-full px-6 py-4 rounded-2xl border text-lg focus:border-blue-500 outline-none">
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-400 mb-3 uppercase">單位 (如：份/公斤)</label>
-                        <input type="text" id="p-unit" required class="w-full px-6 py-4 rounded-2xl border text-lg">
+                        <input type="text" id="p-unit" required class="w-full px-6 py-4 rounded-2xl border text-lg focus:border-blue-500 outline-none">
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-400 mb-3 uppercase">目前庫存</label>
-                        <input type="number" id="p-stock" required class="w-full px-6 py-4 rounded-2xl border text-lg">
+                        <input type="number" id="p-stock" required class="w-full px-6 py-4 rounded-2xl border text-lg focus:border-blue-500 outline-none">
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-400 mb-3 uppercase">分類</label>
-                        <select id="p-category" required class="w-full px-6 py-4 rounded-2xl border text-lg appearance-none bg-white"></select>
+                        <select id="p-category" required class="w-full px-6 py-4 rounded-2xl border text-lg appearance-none bg-white focus:border-blue-500 outline-none"></select>
                     </div>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-400 mb-3 uppercase">商品簡介</label>
-                    <textarea id="p-desc" rows="3" class="w-full px-6 py-4 rounded-2xl border text-lg" placeholder="向顧客介紹這份食材..."></textarea>
+                    <textarea id="p-desc" rows="2" class="w-full px-6 py-4 rounded-2xl border text-lg focus:border-blue-500 outline-none" placeholder="向顧客介紹這份食材..."></textarea>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 mb-3 uppercase">商品照片</label>
-                    <input type="file" id="p-image-file" accept="image/*" class="w-full text-sm">
+                    <label class="block text-xs font-bold text-slate-400 mb-3 uppercase">商品照片網址 (URL)</label>
+                    <input type="url" id="p-image-url" class="w-full px-6 py-4 rounded-2xl border text-lg focus:border-blue-500 outline-none" placeholder="https://example.com/image.jpg">
+                    <p class="text-slate-400 text-xs mt-2">請貼上網路圖片連結，建議使用 Imgur 或網路公開圖片。</p>
                 </div>
                 <div class="flex space-x-4 pt-8">
                     <button type="button" onclick="closeModal()" class="flex-1 py-5 bg-slate-100 rounded-2xl font-bold text-lg hover:bg-slate-200">取消</button>
-                    <button type="submit" class="flex-1 py-5 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-lg">儲存修改</button>
+                    <button type="submit" class="flex-1 py-5 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-lg active:scale-95 transition-all">儲存修改</button>
                 </div>
             </form>
         </div>
@@ -250,7 +254,7 @@
                     return `
                         <div class="bg-white border rounded-[2.5rem] p-8 shadow-sm ${isCritical ? 'stock-critical' : 'border-slate-100'} hover:shadow-xl transition-all">
                             <div class="flex items-center space-x-5">
-                                <img src="${p.image_display || 'https://via.placeholder.com/80'}" class="w-20 h-20 object-cover rounded-2xl shadow-sm">
+                                <img src="${p.image_display || p.image_url || 'https://via.placeholder.com/80?text=無圖片'}" class="w-20 h-20 object-cover rounded-2xl shadow-sm" onerror="this.src='https://via.placeholder.com/80?text=錯誤'">
                                 <div class="flex-1">
                                     <h3 class="font-black text-lg text-slate-900">${p.name}</h3>
                                     <p class="text-sm ${isCritical ? 'text-red-500 font-black' : 'text-slate-500'}">庫存：${p.stock_quantity} ${p.unit}</p>
@@ -283,21 +287,17 @@
                                         <span class="text-xs font-black text-slate-300 tracking-wider">子訂單 #SUB-${order.id}</span>
                                         <span class="text-xs font-bold text-blue-400">/ 主單 #${order.parent_order_id || order.parent_order}</span>
                                     </div>
-                                    
                                     <div class="flex items-center space-x-4 mt-2">
                                         <h3 class="font-black text-3xl text-slate-900">${statusText}</h3>
                                         <span class="px-4 py-1.5 rounded-full text-xs font-black uppercase ${statusClass}">${order.order_status}</span>
                                     </div>
-
                                     <div class="flex items-center text-slate-500 mt-2 bg-slate-50 w-fit px-4 py-1 rounded-full border border-slate-100">
                                         <span class="text-sm font-bold mr-2">👤 顧客：</span>
                                         <span class="text-base font-black text-slate-800">${order.customer_name || '載入中...'}</span>
                                     </div>
                                 </div>
-                                
                                 <div class="flex flex-wrap items-center gap-4">
                                     <button onclick="toggleOrderDetail(${order.id})" class="bg-slate-100 px-8 py-3.5 rounded-2xl font-bold hover:bg-slate-200 transition-colors text-base">查看明細</button>
-                                    
                                     <div class="relative">
                                         <select onchange="updateOrderStatus(${order.id}, this.value)" class="appearance-none bg-blue-600 text-white pl-8 pr-12 py-3.5 rounded-2xl font-black cursor-pointer hover:bg-blue-700 transition-colors outline-none shadow-lg shadow-blue-100 text-base">
                                             <option value="received" ${order.order_status === 'received' ? 'selected' : ''}>備貨中</option>
@@ -343,20 +343,12 @@
             try {
                 const res = await fetch(`${API_BASE}/stall-manager/orders/${orderId}/update_status/`, {
                     method: 'PATCH',
-                    headers: { 
-                        'Content-Type': 'application/json', 
-                        'Authorization': `Token ${token}` 
-                    },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Token ${token}` },
                     body: JSON.stringify({ status: newStatus })
                 });
-                
                 if (res.ok) {
                     loadStallOrders(); 
                     loadDashboardData();
-                } else {
-                    const err = await res.json();
-                    alert("狀態更新失敗：" + (err.detail || "伺服器拒絕更新"));
-                    loadStallOrders(); 
                 }
             } catch (e) { alert("連線伺服器失敗"); }
         }
@@ -401,6 +393,7 @@
                     document.getElementById('p-stock').value = p.stock_quantity;
                     document.getElementById('p-desc').value = p.description || "";
                     document.getElementById('p-category').value = p.category;
+                    document.getElementById('p-image-url').value = p.image_url || ""; // 填入舊網址
                 }
             } else {
                 document.getElementById('product-form').reset();
@@ -415,23 +408,26 @@
             const url = pId ? `${API_BASE}/stall-manager/products/${pId}/` : `${API_BASE}/stall-manager/products/`;
             const method = pId ? 'PATCH' : 'POST';
             
-            const formData = new FormData();
-            formData.append('name', document.getElementById('p-name').value);
-            formData.append('price', document.getElementById('p-price').value);
-            formData.append('unit', document.getElementById('p-unit').value);
-            formData.append('stock_quantity', document.getElementById('p-stock').value);
-            formData.append('description', document.getElementById('p-desc').value);
-            formData.append('category', document.getElementById('p-category').value);
-            formData.append('status', 'on_shelf');
-            
-            const fileInput = document.getElementById('p-image-file');
-            if (fileInput && fileInput.files[0]) formData.append('image', fileInput.files[0]);
+            // 使用 JSON 格式傳送資料，包含圖片網址
+            const data = {
+                name: document.getElementById('p-name').value,
+                price: document.getElementById('p-price').value,
+                unit: document.getElementById('p-unit').value,
+                stock_quantity: document.getElementById('p-stock').value,
+                description: document.getElementById('p-desc').value,
+                category: document.getElementById('p-category').value,
+                image_url: document.getElementById('p-image-url').value, // 傳送圖片網址
+                status: 'on_shelf'
+            };
 
             try {
                 const res = await fetch(url, { 
                     method: method, 
-                    headers: { 'Authorization': `Token ${token}` }, 
-                    body: formData 
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Token ${token}` 
+                    }, 
+                    body: JSON.stringify(data)
                 });
                 if (res.ok) { 
                     closeModal(); 
