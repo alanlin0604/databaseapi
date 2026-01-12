@@ -13,8 +13,8 @@ admin.site.register(Stall)
 admin.site.register(Product)
 admin.site.register(CartItem)
 
-# (可選) 註冊其他模型，以便在 Admin 介面操作
-# admin.site.register(MemberAddress)
-# admin.site.register(ParentOrder)
-# admin.site.register(SubOrder)
-# admin.site.register(OrderItem)
+
+admin.site.register(MemberAddress)
+admin.site.register(ParentOrder)
+admin.site.register(SubOrder)
+admin.site.register(OrderItem)

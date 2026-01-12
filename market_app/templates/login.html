@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>會員登入/註冊 - 線上市場</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Ensuring a clean, bold font for the entire page */
+        body { font-family: 'PingFang TC', 'Heiti TC', 'Microsoft JhengHei', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex items-center justify-center p-8">
+    <div class="bg-white w-full max-w-2xl rounded-[4rem] shadow-2xl overflow-hidden"> <div class="flex border-b-2 border-gray-100">
+            <button id="tab-login" onclick="switchTab('login')" class="flex-1 py-8 text-3xl font-black text-blue-600 border-b-[10px] border-blue-600 transition-all">登入</button>
+            <button id="tab-register" onclick="switchTab('register')" class="flex-1 py-8 text-3xl font-black text-gray-400 hover:text-gray-600 transition-all">註冊</button>
+        </div>
+
+        <div class="p-16"> <form id="login-form" onsubmit="handleAuth(event, 'login')" class="space-y-10">
+                <h2 class="text-5xl font-black text-gray-800 mb-12 text-center">歡迎回來</h2>
+                
+                <div class="space-y-6">
+                    <label class="block text-2xl font-bold text-gray-500 ml-4">帳號名稱</label>
+                    <input type="text" id="login-user" placeholder="請輸入您的帳號" required 
+                           class="w-full px-8 py-7 rounded-[2rem] border-4 border-gray-100 focus:border-blue-500 outline-none text-3xl transition-all shadow-sm">
+                </div>
+
+                <div class="space-y-6">
+                    <label class="block text-2xl font-bold text-gray-500 ml-4">登入密碼</label>
+                    <input type="password" id="login-pass" placeholder="請輸入您的密碼" required 
+                           class="w-full px-8 py-7 rounded-[2rem] border-4 border-gray-100 focus:border-blue-500 outline-none text-3xl transition-all shadow-sm">
+                </div>
+
+                <button type="submit" class="w-full bg-blue-600 text-white py-8 rounded-[2rem] font-black text-4xl hover:bg-blue-700 transition-all shadow-2xl shadow-blue-200 mt-8 active:scale-95">
+                    立即登入
+                </button>
+            </form>
+
+            <form id="register-form" onsubmit="handleAuth(event, 'register')" class="space-y-10 hidden">
+                <h2 class="text-5xl font-black text-gray-800 mb-12 text-center">加入會員</h2>
+                
+                <div class="space-y-6">
+                    <label class="block text-2xl font-bold text-gray-500 ml-4">帳號名稱</label>
+                    <input type="text" id="reg-user" placeholder="設定您的帳號" required 
+                           class="w-full px-8 py-7 rounded-[2rem] border-4 border-gray-100 focus:border-green-500 outline-none text-3xl transition-all shadow-sm">
+                </div>
+
+                <div class="space-y-6">
+                    <label class="block text-2xl font-bold text-gray-500 ml-4">電子郵件</label>
+                    <input type="email" id="reg-email" placeholder="example@mail.com" required 
+                           class="w-full px-8 py-7 rounded-[2rem] border-4 border-gray-100 focus:border-green-500 outline-none text-3xl transition-all shadow-sm">
+                </div>
+
+                <div class="space-y-6">
+                    <label class="block text-2xl font-bold text-gray-500 ml-4">設定密碼</label>
+                    <input type="password" id="reg-pass" placeholder="設定您的密碼" required 
+                           class="w-full px-8 py-7 rounded-[2rem] border-4 border-gray-100 focus:border-green-500 outline-none text-3xl transition-all shadow-sm">
+                </div>
+
+                <button type="submit" class="w-full bg-green-600 text-white py-8 rounded-[2rem] font-black text-4xl hover:bg-green-700 transition-all shadow-2xl shadow-green-200 mt-8 active:scale-95">
+                    完成註冊
+                </button>
+            </form>
+            
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "http://127.0.0.1:8000/api";
+
+        function switchTab(type) {
+            const isLogin = type === 'login';
+            document.getElementById('login-form').classList.toggle('hidden', !isLogin);
+            document.getElementById('register-form').classList.toggle('hidden', isLogin);
+            
+            // UI Style Update
+            const tabLogin = document.getElementById('tab-login');
+            const tabReg = document.getElementById('tab-register');
+            
+            if (isLogin) {
+                tabLogin.className = "flex-1 py-8 text-3xl font-black text-blue-600 border-b-[10px] border-blue-600 transition-all";
+                tabReg.className = "flex-1 py-8 text-3xl font-black text-gray-400 hover:text-gray-600 transition-all";
+            } else {
+                tabLogin.className = "flex-1 py-8 text-3xl font-black text-gray-400 hover:text-gray-600 transition-all";
+                tabReg.className = "flex-1 py-8 text-3xl font-black text-green-600 border-b-[10px] border-green-600 transition-all";
+            }
+        }
+
+        async function handleAuth(event, type) {
+            event.preventDefault();
+            const data = type === 'login' 
+                ? { 
+                    username: document.getElementById('login-user').value, 
+                    password: document.getElementById('login-pass').value 
+                  } 
+                : { 
+                    username: document.getElementById('reg-user').value, 
+                    email: document.getElementById('reg-email').value, 
+                    password: document.getElementById('reg-pass').value 
+                  };
+
+            try {
+                const res = await fetch(`${API_BASE}/${type}/`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify(data) 
+                });
+                const result = await res.json();
+                
+                if (res.ok) { 
+                    localStorage.setItem('token', result.token); 
+                    window.location.href = "/"; 
+                } else { 
+                    alert("操作失敗：" + (result.detail || "請檢查資料是否正確")); 
+                }
+            } catch (err) {
+                alert("連線伺服器失敗，請稍後再試");
+            }
+        }
+    </script>
+</body>
+</html>

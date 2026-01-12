@@ -5,135 +5,310 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>我的線上市場 - 主介面</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes subtle-bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+        .animate-pickup { animation: subtle-bounce 2s infinite; }
+        /* 統一全域字體為更清晰的黑體組合 */
+        body { font-family: 'PingFang TC', 'Heiti TC', 'Microsoft JhengHei', sans-serif; }
+        
+        /* 自定義 Toast 動畫 */
+        #toast-container {
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+    </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
 
-    <nav class="bg-blue-600 p-4 text-white shadow-lg">
+    <div id="toast-container" class="fixed top-10 left-1/2 -translate-x-1/2 z-[100] opacity-0 pointer-events-none transform -translate-y-5">
+        <div class="bg-gray-800/90 backdrop-blur-md text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center space-x-3 border border-white/20">
+            <span class="text-2xl">✅</span>
+            <span class="text-lg font-bold">已加入購物車</span>
+        </div>
+    </div>
+
+    <nav class="bg-blue-600 p-5 text-white shadow-xl">
         <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-2xl font-bold">傳統市場線上購物測試</h1>
-            <div class="flex items-center space-x-4">
-                <a href="/cart/" class="bg-yellow-400 hover:bg-yellow-500 text-blue-900 px-4 py-2 rounded-lg font-bold transition duration-200 flex items-center">
-                    🛒 查看我的購物車
-                </a>
+            <div class="flex items-center space-x-2">
+                <span class="text-3xl">🥬</span>
+                <h1 class="text-2xl font-black tracking-wider">傳統市場線上購物</h1>
+            </div>
+
+            <div class="flex items-center space-x-6">
+                <div id="user-info" class="hidden flex items-center space-x-4">
+                    <div class="bg-blue-800/50 px-4 py-2 rounded-2xl flex items-center space-x-2 border border-blue-400/30">
+                        <span class="text-xl">💰</span>
+                        <span id="nav-points" class="text-lg font-black text-yellow-300">0</span>
+                        <span class="text-sm text-blue-200">點</span>
+                    </div>
+                    
+                    <div class="flex items-center space-x-2 bg-white/10 px-4 py-2 rounded-2xl">
+                        <span class="text-blue-200 text-sm">Hi,</span>
+                        <span id="nav-username" class="text-lg font-bold"></span>
+                    </div>
+
+                    <a href="/stall-admin/" class="text-base font-bold bg-slate-800 text-white px-5 py-2.5 rounded-2xl hover:bg-black transition-all flex items-center shadow-lg active:scale-95">
+                        <span class="mr-2">⚙️</span> 攤商管理
+                    </a>
+
+                    <button onclick="handleLogout()" class="text-base font-medium text-blue-100 hover:text-white hover:underline transition">
+                        登出
+                    </button>
+                </div>
+
+                <div id="auth-links" class="flex items-center">
+                    <a href="/login/" class="text-lg font-bold bg-white/20 px-6 py-2.5 rounded-2xl hover:bg-white/30 transition">
+                        🔑 登入 / 註冊
+                    </a>
+                </div>
                 
-                <a href="http://127.0.0.1:8000/admin/" target="_blank" class="hover:underline text-sm opacity-90">
-                    進入管理後台
-                </a>
+                <div class="flex items-center space-x-6 border-l border-blue-500/50 pl-6">
+                    <a href="/my-orders/" class="text-lg font-bold text-white hover:text-blue-100 transition flex items-center">
+                        <span class="mr-1">📋</span> 我的訂單
+                    </a>
+                    <a href="/cart/" class="bg-yellow-400 hover:bg-yellow-500 text-blue-900 px-6 py-3 rounded-2xl font-black text-lg transition duration-200 flex items-center shadow-lg active:scale-95">
+                        <span class="mr-2">🛒</span> 購物車
+                    </a>
+                </div>
             </div>
         </div>
     </nav>
 
+    <div class="container mx-auto px-6 mt-8">
+        <div class="relative max-w-3xl mx-auto mb-10">
+            <input type="text" id="search-input" oninput="handleSearch(this.value)" placeholder="搜尋新鮮食材..." 
+                   class="w-full pl-14 pr-6 py-5 rounded-3xl border-2 border-transparent bg-white shadow-md focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none text-xl text-gray-700">
+            <span class="absolute left-5 top-5 text-gray-400 text-2xl">🔍</span>
+        </div>
+
+        <div id="order-tracking-widget" class="hidden max-w-2xl mx-auto mb-10">
+            <div id="widget-content"></div>
+        </div>
+    </div>
+
     <div class="container mx-auto p-6">
-        <section class="mb-10">
-            <h2 class="text-xl font-bold mb-4 border-l-4 border-blue-600 pl-2">所有攤商</h2>
-            <div id="stall-list" class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <p class="text-gray-500">載入中...</p>
-            </div>
-        </section>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-10">
+            <aside class="space-y-8">
+                <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+                    <h2 class="text-xl font-black text-gray-800 mb-5 flex items-center">
+                        <span class="mr-2">🏪</span> 攤商篩選
+                    </h2>
+                    <div id="stall-list" class="space-y-2 text-base"></div>
+                </div>
 
-        <hr class="my-10">
+                <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+                    <h2 class="text-xl font-black text-gray-800 mb-5 flex items-center">
+                        <span class="mr-2">📂</span> 商品分類
+                    </h2>
+                    <div id="category-list" class="space-y-2 text-base"></div>
+                </div>
+            </aside>
 
-        <section>
-            <h2 class="text-xl font-bold mb-4 border-l-4 border-green-600 pl-2">推薦商品</h2>
-            <div id="product-list" class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <p class="text-gray-500">載入中...</p>
-            </div>
-        </section>
+            <main class="md:col-span-3">
+                <div class="flex justify-between items-center mb-8">
+                    <h2 id="product-list-title" class="text-2xl font-black border-l-8 border-blue-600 pl-4 text-gray-800">今日新鮮商品</h2>
+                </div>
+                <div id="product-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <p class="text-gray-400 col-span-full text-center py-24 text-xl">正在準備新鮮食材...</p>
+                </div>
+            </main>
+        </div>
     </div>
 
     <script>
-        // API 基礎位址
         const API_BASE = "http://127.0.0.1:8000/api";
+        const token = localStorage.getItem('token');
+        
+        let currentSelectedStall = null;
+        let currentSelectedCategory = null;
+        let categoriesData = [];
+        let stallsData = [];
 
-        // 1. 獲取攤商資料
-        async function fetchStalls() {
-            try {
-                const response = await fetch(`${API_BASE}/stalls/`);
-                const data = await response.json();
-                const container = document.getElementById('stall-list');
-                container.innerHTML = '';
-
-                data.forEach(stall => {
-                    container.innerHTML += `
-                        <div class="bg-white rounded-lg shadow p-4 border-t-4 border-blue-500">
-                            <img src="${stall.logo_url || 'https://via.placeholder.com/150'}" class="w-20 h-20 object-cover rounded mb-2">
-                            <h3 class="text-lg font-bold">${stall.name}</h3>
-                            <p class="text-sm text-gray-600">${stall.description || '暫無介紹'}</p>
-                            <p class="mt-2 text-blue-600 font-semibold">📞 ${stall.contact_phone}</p>
-                            <span class="inline-block mt-2 px-2 py-1 text-xs bg-green-100 text-green-700 rounded">
-                                ${stall.is_active ? '營業中' : '休息中'}
-                            </span>
-                        </div>
-                    `;
-                });
-            } catch (error) {
-                console.error("無法載入攤商:", error);
-            }
+        function showToast(message) {
+            const toast = document.getElementById('toast-container');
+            toast.querySelector('span.text-lg').innerText = message;
+            toast.classList.remove('opacity-0', 'pointer-events-none', '-translate-y-5');
+            toast.classList.add('opacity-100', 'translate-y-0');
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', 'pointer-events-none', '-translate-y-5');
+            }, 2000);
         }
 
-        // 2. 獲取商品資料
-        async function fetchProducts() {
+        async function checkAuth() {
+            if (!token || token === "null") return;
             try {
-                const response = await fetch(`${API_BASE}/products/`);
-                const data = await response.json();
-                const container = document.getElementById('product-list');
-                container.innerHTML = '';
-
-                if (data.length === 0) {
-                    container.innerHTML = '<p class="text-gray-400">目前沒有商品，請去後台新增！</p>';
-                    return;
+                const res = await fetch(`${API_BASE}/member/me/`, {
+                    headers: { 'Authorization': `Token ${token}` }
+                });
+                if (res.ok) {
+                    const user = await res.json();
+                    document.getElementById('auth-links').classList.add('hidden');
+                    document.getElementById('user-info').classList.remove('hidden');
+                    document.getElementById('nav-username').innerText = user.username;
+                    document.getElementById('nav-points').innerText = user.current_points;
                 }
+            } catch (e) { console.error("Auth check failed", e); }
+        }
 
-                data.forEach(product => {
-                    container.innerHTML += `
-                        <div class="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-shadow">
-                            <img src="${product.image_url || 'https://via.placeholder.com/300x200'}" class="w-full h-40 object-cover">
-                            <div class="p-4">
-                                <h3 class="font-bold text-gray-800">${product.name}</h3>
-                                <p class="text-sm text-gray-500 mt-1">${product.unit}</p>
-                                <div class="mt-3 flex justify-between items-center">
-                                    <span class="text-xl font-bold text-red-600">$${product.price}</span>
-                                    <button onclick="addToCart(${product.id})" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">加入購物車</button>
-                                </div>
+        async function fetchProducts(stallId = null, categoryId = null) {
+            currentSelectedStall = stallId;
+            currentSelectedCategory = categoryId;
+            renderStallList();
+            renderCategoryList();
+
+            let url = `${API_BASE}/products/`;
+            let params = [];
+            if (stallId) params.push(`stall=${stallId}`);
+            if (categoryId) params.push(`category=${categoryId}`);
+            if (params.length > 0) url += `?${params.join('&')}`;
+            
+            const container = document.getElementById('product-container');
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                container.innerHTML = data.length === 0 ? `<p class="col-span-full text-center py-20 text-gray-400 text-xl italic">目前該分類下無商品</p>` : data.map(p => `
+                    <div class="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden hover:shadow-2xl transition-all group">
+                        <div class="relative overflow-hidden aspect-[4/3]">
+                            <img src="${p.image_display || p.image_url || 'https://via.placeholder.com/400x300?text=無圖片'}" 
+                                 class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                 onerror="this.src='https://via.placeholder.com/400x300?text=圖片載入失敗'">
+                        </div>
+                        <div class="p-6">
+                            <h3 class="text-xl font-black text-gray-800 mb-2">${p.name}</h3>
+                            <p class="text-gray-400 text-sm mb-6 h-10 line-clamp-2 leading-relaxed">${p.description || '新鮮直送，品質保證。'}</p>
+                            <div class="flex justify-between items-center">
+                                <span class="text-3xl font-black text-red-500">$${Math.round(p.price)}</span>
+                                <button onclick="addToCart(${p.id}, event.currentTarget)" 
+                                        class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-full font-bold text-base shadow-lg shadow-blue-100 transition active:scale-95 flex items-center">
+                                    🛒 加入購物車
+                                </button>
                             </div>
                         </div>
-                    `;
-                });
-            } catch (error) {
-                console.error("無法載入商品:", error);
-            }
+                    </div>
+                `).join('');
+            } catch (e) { container.innerHTML = `<p class="col-span-full text-center text-red-500 text-lg">服務忙碌中，請稍後再試</p>`; }
         }
 
-        async function addToCart(productId) {
-            // 這裡暫時模擬會員 ID 為 1 (小明)
-            const cartData = {
-                member: 1, 
-                product: productId,
-                quantity: 1
-            };
+        async function initData() {
+            try {
+                const [stallRes, catRes] = await Promise.all([
+                    fetch(`${API_BASE}/stalls/`),
+                    fetch(`${API_BASE}/categories/`)
+                ]);
+                stallsData = await stallRes.json();
+                categoriesData = await catRes.json();
+                renderStallList();
+                renderCategoryList();
+            } catch (e) { console.error("初始化失敗", e); }
+        }
+
+        function renderStallList() {
+            const list = document.getElementById('stall-list');
+            const allBtnStyle = currentSelectedStall === null ? "bg-blue-600 text-white shadow-lg scale-105" : "hover:bg-blue-50 text-blue-600 border border-blue-100";
+            let html = `<button onclick="fetchProducts(null, currentSelectedCategory)" class="w-full text-left px-5 py-3 rounded-2xl font-black transition-all mb-2 ${allBtnStyle}">🏪 全部攤商</button>`;
+            stallsData.forEach(s => {
+                const isActive = currentSelectedStall == s.id;
+                const style = isActive ? "bg-blue-500 text-white shadow-md scale-105" : "hover:bg-gray-100 text-gray-600 border border-transparent";
+                html += `<button onclick="fetchProducts(${s.id}, currentSelectedCategory)" class="w-full text-left px-5 py-3 rounded-2xl truncate transition-all mb-2 font-bold ${style}">📍 ${s.name}</button>`;
+            });
+            list.innerHTML = html;
+        }
+
+        function renderCategoryList() {
+            const list = document.getElementById('category-list');
+            const allBtnStyle = currentSelectedCategory === null ? "bg-green-600 text-white shadow-lg scale-105" : "hover:bg-green-50 text-green-600 border border-green-100";
+            let html = `<button onclick="fetchProducts(currentSelectedStall, null)" class="w-full text-left px-5 py-3 rounded-2xl font-black transition-all mb-2 ${allBtnStyle}">🥬 全部類別</button>`;
+            categoriesData.forEach(c => {
+                const isActive = currentSelectedCategory == c.id;
+                const style = isActive ? "bg-green-500 text-white shadow-md scale-105" : "hover:bg-gray-100 text-gray-600 border border-transparent";
+                html += `<button onclick="fetchProducts(currentSelectedStall, ${c.id})" class="w-full text-left px-5 py-3 rounded-2xl transition-all mb-2 font-bold ${style}">🏷️ ${c.name}</button>`;
+            });
+            list.innerHTML = html;
+        }
+
+        async function fetchLatestOrder() {
+            if (!token) return;
+            try {
+                const res = await fetch(`${API_BASE}/parent-orders/`, { headers: { 'Authorization': `Token ${token}` } });
+                const orders = await res.json();
+                if (orders.length > 0) {
+                    const order = orders[0];
+                    const widget = document.getElementById('order-tracking-widget');
+                    let subHtml = order.sub_orders.map(so => {
+                        let statusLabel = "";
+                        let statusClass = "";
+                        switch (so.order_status) {
+                            case 'received': statusLabel = "⏳ 商家備貨中"; statusClass = "bg-amber-100 text-amber-600 border-amber-200"; break;
+                            case 'ready_for_pickup': statusLabel = "🎁 現場可取貨！"; statusClass = "bg-green-500 text-white animate-pulse shadow-lg shadow-green-100"; break;
+                            case 'completed': statusLabel = "✅ 已取貨完成"; statusClass = "bg-gray-100 text-gray-400 border-gray-200"; break;
+                            default: statusLabel = "正在準備中"; statusClass = "bg-blue-100 text-blue-600";
+                        }
+                        return `<div class="flex justify-between items-center bg-white p-4 rounded-2xl border border-gray-100 mb-3 shadow-sm"><span class="text-base font-black text-gray-700">🏪 ${so.stall_name}</span><span class="px-4 py-1.5 rounded-full text-xs font-black border ${statusClass}">${statusLabel}</span></div>`;
+                    }).join('');
+
+                    document.getElementById('widget-content').innerHTML = `<div class="bg-white/90 backdrop-blur-lg border border-white rounded-[2.5rem] p-8 shadow-2xl"><div class="flex justify-between items-center mb-6"><div><h2 class="font-black text-xl text-gray-800 flex items-center"><span class="animate-pickup mr-3">🛵</span> 訂單狀態追蹤</h2><p class="text-xs text-gray-400 mt-1 font-mono">ORDER #${order.id} | ${new Date(order.order_date).toLocaleString()}</p></div><a href="/my-orders/" class="text-base text-blue-600 font-black hover:underline underline-offset-4">查看詳情 →</a></div><div class="grid grid-cols-1 gap-1">${subHtml}</div></div>`;
+                    widget.classList.remove('hidden');
+                }
+            } catch (e) { console.error("Tracking Error", e); }
+        }
+
+        // ✅ 修正後的 addToCart：加入穩定防重複機制
+        async function addToCart(productId, buttonElement) {
+            if (!token) { 
+                showToast("⚠️ 請先登入"); 
+                setTimeout(() => window.location.href = "/login/", 1000);
+                return; 
+            }
+
+            // 1. 安全檢查：如果按鈕不存在或已被禁用則中斷
+            if (!buttonElement || buttonElement.disabled) return;
+
+            // 2. 進入處理狀態
+            buttonElement.disabled = true;
+            const originalText = buttonElement.innerHTML;
+            buttonElement.innerHTML = "⏳ 處理中...";
+            buttonElement.classList.add('opacity-50', 'cursor-not-allowed');
 
             try {
-                const response = await fetch(`${API_BASE}/cart/`, {
+                const res = await fetch(`${API_BASE}/cart/`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(cartData)
+                    headers: { 
+                        'Content-Type': 'application/json', 
+                        'Authorization': `Token ${token}` 
+                    },
+                    body: JSON.stringify({ product: productId, quantity: 1 })
                 });
 
-                if (response.ok) {
-                    alert('成功加入購物車！');
+                if (res.ok) {
+                    showToast(" 已成功加入購物車");
                 } else {
-                    const err = await response.json();
-                    alert('加入失敗: ' + JSON.stringify(err));
+                    const errorData = await res.json();
+                    showToast("❌ " + (errorData.detail || "加入失敗"));
                 }
-            } catch (error) {
-                console.error("購物車請求出錯:", error);
+            } catch (e) {
+                console.error("購物車請求失敗:", e);
+                showToast("❌ 網路連線錯誤");
+            } finally {
+                // 3. 無論如何都恢復按鈕，確保下一次可以點擊
+                if (buttonElement) {
+                    buttonElement.disabled = false;
+                    buttonElement.innerHTML = originalText;
+                    buttonElement.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
             }
         }
 
-        // 初始化
+        function handleLogout() { localStorage.clear(); window.location.reload(); }
+
         window.onload = () => {
-            fetchStalls();
+            checkAuth();
+            initData();
             fetchProducts();
+            fetchLatestOrder();
+            setInterval(fetchLatestOrder, 30000); 
         };
     </script>
 </body>

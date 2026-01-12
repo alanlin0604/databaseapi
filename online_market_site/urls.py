@@ -1,8 +1,14 @@
 from django.contrib import admin
 from django.urls import path, include
 
+from django.conf import settings
+from django.conf.urls.static import static
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     # 這行是關鍵！它會把 market_app 裡所有的路由（包含首頁和 API）拉進來
     path('', include('market_app.urls')), 
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>訂單結帳付款 - 線上市場</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 統一全域字體為更清晰的黑體組合 */
+        body { font-family: 'PingFang TC', 'Heiti TC', 'Microsoft JhengHei', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-8">
+    <div class="bg-white p-12 rounded-[3rem] shadow-[0_35px_60px_-15px_rgba(0,0,0,0.1)] max-w-2xl w-full border border-gray-100">
+        <h2 class="text-3xl font-black text-center mb-10 text-blue-600 tracking-tight">最後一步：確認付款資訊</h2>
+        
+        <div id="payment-info" class="space-y-8 mb-12 bg-slate-50 p-8 rounded-3xl">
+            <div class="flex justify-between items-center border-b border-gray-200 pb-4">
+                <span class="text-gray-500 text-xl font-bold">訂單編號</span>
+                <span id="display-order-id" class="font-mono font-black text-2xl text-slate-800">---</span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-gray-500 text-xl font-bold">應支付總計</span>
+                <span id="display-amount" class="text-5xl font-black text-red-600">$0</span>
+            </div>
+        </div>
+
+        <div class="space-y-5">
+            <p class="text-xl font-black text-gray-800 mb-4 pl-2">選擇您的付款方式：</p>
+            
+            <button disabled class="w-full py-6 bg-gray-300 text-gray-500 rounded-[2rem] text-2xl font-black cursor-not-allowed shadow-none">
+                LINE Pay (暫未開放)
+            </button>
+
+            <button disabled class="w-full py-6 bg-gray-300 text-gray-500 rounded-[2rem] text-2xl font-black cursor-not-allowed shadow-none">
+                全支付 (暫未開放)
+            </button>
+
+            <button onclick="pay('CASH')" class="w-full py-6 bg-gray-800 text-white rounded-[2rem] text-2xl font-black hover:brightness-95 transition shadow-lg shadow-gray-200 active:scale-95">
+                現場現金付款 (到攤點收)
+            </button>
+        </div>
+        
+        </div>
+
+    <script>
+        const API_BASE = "http://127.0.0.1:8000/api";
+        const urlParams = new URLSearchParams(window.location.search);
+        const orderId = urlParams.get('id');
+        const token = localStorage.getItem('token'); 
+
+        async function initPayment() {
+            if (!token) { window.location.href = "/login/"; return; } 
+            if (!orderId) { alert("無效的訂單編號"); return; }
+            
+            document.getElementById('display-order-id').innerText = `#${orderId}`;
+            
+            try {
+                const res = await fetch(`${API_BASE}/parent-orders/${orderId}/`, {
+                    headers: { 'Authorization': `Token ${token}` }
+                });
+                
+                if (!res.ok) throw new Error("權限不足或訂單不存在");
+                
+                const order = await res.json();
+                const amount = parseFloat(order.final_paid_amount).toFixed(0);
+                document.getElementById('display-amount').innerText = `$${amount}`;
+            } catch (error) {
+                console.error("初始化失敗:", error);
+                alert("無法讀取訂單資訊，請重新登入");
+            }
+        }
+
+        async function pay(method) {
+            if(!confirm(`確認使用 ${method} 進行支付？`)) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/parent-orders/${orderId}/`, {
+                    method: 'PATCH',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Token ${token}` 
+                    },
+                    body: JSON.stringify({ 
+                        order_status: 'paid',
+                        payment_method: method
+                    })
+                });
+
+                if (response.ok) {
+                    alert("🎉 付款成功！請前往市場領取您的商品。");
+                    window.location.href = "/my-orders/"; 
+                } else {
+                    alert("付款失敗，請檢查網路狀態");
+                }
+            } catch (error) {
+                alert("連線伺服器失敗");
+            }
+        }
+
+        window.onload = initPayment;
+    </script>
+</body>
+</html>

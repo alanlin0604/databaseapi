@@ -1,0 +1,1 @@
+web: gunicorn online_market_site.wsgi:application

@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>攤商營運管理系統 - 我的市場</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 庫存預警：呼吸燈效果 */
+        @keyframes pulse-red {
+            0%, 100% { border-color: #ef4444; box-shadow: 0 0 0 0px rgba(239, 68, 68, 0.4); }
+            50% { border-color: #fca5a5; box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+        }
+        .stock-critical { animation: pulse-red 2s infinite; border-width: 2px !important; }
+        
+        /* 隱藏滾動條但保留功能 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* 狀態標籤樣式 */
+        .status-badge-received { background-color: #fef3c7; color: #d97706; } /* 備貨中：橘黃 */
+        .status-badge-ready { background-color: #dcfce7; color: #16a34a; }    /* 可取貨：綠色 */
+        .status-badge-completed { background-color: #f1f5f9; color: #64748b; } /* 已取貨：灰色 */
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 font-sans text-base"> <nav class="bg-slate-900 text-white shadow-2xl sticky top-0 z-50">
+        <div class="container mx-auto px-6 py-5 flex justify-between items-center"> <div class="flex items-center space-x-4">
+                <div class="bg-blue-600 p-2.5 rounded-xl shadow-inner text-xl">🏪</div>
+                <h1 class="text-xl font-black tracking-tighter">營運管理中心</h1> </div>
+            <div class="flex items-center space-x-6">
+                <span id="live-time" class="text-sm font-mono text-slate-400 hidden md:block"></span>
+                <a href="/" class="text-base font-bold bg-white/10 hover:bg-white/20 px-6 py-2.5 rounded-full transition-all">
+                    返回前台
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-6 lg:p-10">
+        
+        <div class="flex space-x-4 mb-10 bg-slate-200/50 p-2 rounded-2xl w-fit backdrop-blur-md">
+            <button onclick="switchTab('dashboard')" id="tab-dashboard" class="px-7 py-3 rounded-xl font-bold transition-all text-base text-slate-500 hover:text-slate-800">數據概覽</button>
+            <button onclick="switchTab('products')" id="tab-products" class="px-7 py-3 rounded-xl font-bold transition-all text-base text-slate-500 hover:text-slate-800">庫存商品</button>
+            <button onclick="switchTab('orders')" id="tab-orders" class="px-7 py-3 rounded-xl font-bold transition-all text-base text-slate-500 hover:text-slate-800">訂單管理</button>
+            <button onclick="switchTab('settings')" id="tab-settings" class="px-7 py-3 rounded-xl font-bold transition-all text-base text-slate-500 hover:text-slate-800">店鋪設定</button>
+        </div>
+
+        <div id="dashboard-section" class="space-y-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8"> <div class="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 relative overflow-hidden group">
+                    <p class="text-slate-400 text-sm font-black uppercase tracking-widest">今日成交</p> <h2 id="stat-today-revenue" class="text-5xl font-black text-slate-900 mt-3">$0</h2> <p class="text-xs text-green-500 font-bold mt-3">● 即時更新中</p>
+                </div>
+                <div class="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 relative overflow-hidden group">
+                    <p class="text-slate-400 text-sm font-black uppercase tracking-widest">累計營收</p>
+                    <h2 id="stat-total-revenue" class="text-5xl font-black text-slate-900 mt-3">$0</h2>
+                </div>
+                <div class="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 relative overflow-hidden group">
+                    <p class="text-slate-400 text-sm font-black uppercase tracking-widest">待處理訂單</p>
+                    <h2 id="stat-pending-orders" class="text-5xl font-black text-blue-600 mt-3">0</h2>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-12">
+                <h3 class="text-2xl font-black text-slate-900 mb-10">熱銷排行榜</h3>
+                <div id="top-products-list" class="space-y-6">
+                    <p class="text-slate-400 italic text-base">尚未有銷售數據</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="products-section" class="hidden space-y-8">
+            <div class="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-10 flex flex-col md:flex-row justify-between items-center">
+                <div>
+                    <h2 class="text-3xl font-black text-slate-900">庫存商品清單</h2>
+                    <p class="text-slate-500 text-base mt-2">管理架上商品與即時庫存數量</p>
+                </div>
+                <button onclick="openModal()" class="bg-blue-600 text-white px-12 py-4.5 rounded-2xl font-black shadow-xl shadow-blue-100 hover:scale-105 active:scale-95 transition-all text-lg">
+                    + 新增商品
+                </button>
+            </div>
+            <div id="product-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"></div>
+        </div>
+
+        <div id="orders-section" class="hidden space-y-8">
+            <div class="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-10 mb-6">
+                <h2 class="text-3xl font-black text-slate-900">即時訂單處理區</h2>
+                <p class="text-slate-500 text-base mt-2">展開明細即可查看顧客需求，並手動更改訂單狀態</p>
+            </div>
+            <div id="stall-order-list" class="grid grid-cols-1 gap-8"></div>
+        </div>
+
+        <div id="settings-section" class="hidden">
+            <div class="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-12 max-w-2xl mx-auto">
+                <h2 class="text-3xl font-black text-slate-900 mb-3">店鋪資訊</h2>
+                <p class="text-slate-500 text-base mb-10">更改營業時間、名稱或店鋪簡介。</p>
+                <form id="stall-settings-form" class="space-y-8">
+                    <div class="grid grid-cols-2 gap-8">
+                        <div>
+                            <label class="block text-xs font-black text-slate-400 uppercase mb-3">店名</label>
+                            <input type="text" id="s-name" required class="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50 outline-none text-lg">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-slate-400 uppercase mb-3">電話</label>
+                            <input type="text" id="s-phone" required class="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50 outline-none text-lg">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-8">
+                        <div>
+                            <label class="block text-xs font-black text-slate-400 uppercase mb-3">開市時間</label>
+                            <input type="time" id="s-open" required class="w-full px-6 py-4 rounded-2xl border border-slate-200 text-lg">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-slate-400 uppercase mb-3">收攤時間</label>
+                            <input type="time" id="s-close" required class="w-full px-6 py-4 rounded-2xl border border-slate-200 text-lg">
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4 p-5 bg-blue-50 rounded-2xl border border-blue-100">
+                        <input type="checkbox" id="s-active" class="w-6 h-6 rounded-lg text-blue-600 focus:ring-blue-500">
+                        <label for="s-active" class="text-base font-black text-blue-800">目前店鋪營運中</label>
+                    </div>
+                    <button type="submit" class="w-full bg-slate-900 text-white py-6 rounded-2xl font-black active:scale-95 transition-all text-xl">
+                        儲存所有設定
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="product-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-sm">
+        <div class="bg-white rounded-[3rem] max-w-xl w-full shadow-2xl p-12 overflow-y-auto max-h-[90vh]">
+            <h2 id="modal-title" class="text-3xl font-black text-slate-900 mb-10">編輯商品</h2>
+            <form id="product-form" class="space-y-6">
+                <input type="hidden" id="p-id">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="col-span-2">
+                        <label class="block text-xs font-bold text-slate-400 mb-3 uppercase">品名</label>
+                        <input type="text" id="p-name" required class="w-full px-6 py-4 rounded-2xl border text-lg">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 mb-3 uppercase">售價 ($)</label>
+                        <input type="number" id="p-price" required class="w-full px-6 py-4 rounded-2xl border text-lg">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 mb-3 uppercase">單位 (如：份/公斤)</label>
+                        <input type="text" id="p-unit" required class="w-full px-6 py-4 rounded-2xl border text-lg">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 mb-3 uppercase">目前庫存</label>
+                        <input type="number" id="p-stock" required class="w-full px-6 py-4 rounded-2xl border text-lg">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 mb-3 uppercase">分類</label>
+                        <select id="p-category" required class="w-full px-6 py-4 rounded-2xl border text-lg appearance-none bg-white"></select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-3 uppercase">商品簡介</label>
+                    <textarea id="p-desc" rows="3" class="w-full px-6 py-4 rounded-2xl border text-lg" placeholder="向顧客介紹這份食材..."></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-3 uppercase">商品照片</label>
+                    <input type="file" id="p-image-file" accept="image/*" class="w-full text-sm">
+                </div>
+                <div class="flex space-x-4 pt-8">
+                    <button type="button" onclick="closeModal()" class="flex-1 py-5 bg-slate-100 rounded-2xl font-bold text-lg hover:bg-slate-200">取消</button>
+                    <button type="submit" class="flex-1 py-5 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-lg">儲存修改</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "http://127.0.0.1:8000/api";
+        const token = localStorage.getItem('token');
+        let currentStallId = null;
+        let allProducts = [];
+
+        window.onload = async () => {
+            setInterval(() => {
+                const el = document.getElementById('live-time');
+                if (el) el.innerText = new Date().toLocaleTimeString();
+            }, 1000);
+            
+            await loadStallSettings();
+            switchTab('dashboard');
+        };
+
+        function switchTab(tab) {
+            const tabs = ['dashboard', 'products', 'orders', 'settings'];
+            tabs.forEach(t => {
+                const section = document.getElementById(`${t}-section`);
+                const btn = document.getElementById(`tab-${t}`);
+                if (section) section.classList.add('hidden');
+                if (btn) btn.className = "px-7 py-3 rounded-xl font-bold transition-all text-base text-slate-500 hover:text-slate-800";
+            });
+
+            const activeSection = document.getElementById(`${tab}-section`);
+            const activeBtn = document.getElementById(`tab-${tab}`);
+            if (activeSection) activeSection.classList.remove('hidden');
+            if (activeBtn) activeBtn.className = "px-7 py-3 rounded-xl font-bold transition-all text-base bg-white shadow-lg text-blue-600";
+            
+            if (tab === 'dashboard') loadDashboardData();
+            if (tab === 'products') loadMyProducts();
+            if (tab === 'orders') loadStallOrders();
+            if (tab === 'settings') loadStallSettings();
+        }
+
+        async function loadDashboardData() {
+            if (!currentStallId) return;
+            try {
+                const res = await fetch(`${API_BASE}/stalls/${currentStallId}/dashboard_stats/`, {
+                    headers: { 'Authorization': `Token ${token}` }
+                });
+                const data = await res.json();
+                document.getElementById('stat-today-revenue').innerText = `$${Math.round(data.today_revenue || 0)}`;
+                document.getElementById('stat-total-revenue').innerText = `$${Math.round(data.total_revenue || 0)}`;
+                
+                const topList = document.getElementById('top-products-list');
+                if (data.top_products && data.top_products.length > 0) {
+                    const maxQty = Math.max(...data.top_products.map(p => p.total_qty), 1);
+                    topList.innerHTML = data.top_products.map((p, index) => {
+                        const progress = (p.total_qty / maxQty) * 100;
+                        return `
+                            <div class="space-y-3">
+                                <div class="flex justify-between text-base font-black">
+                                    <span>${index + 1}. ${p.product__name}</span>
+                                    <span class="text-blue-600">售出 ${p.total_qty}</span>
+                                </div>
+                                <div class="h-3 bg-slate-100 rounded-full overflow-hidden">
+                                    <div class="h-full bg-blue-500" style="width: ${progress}%"></div>
+                                </div>
+                            </div>`;
+                    }).join('');
+                } else {
+                    topList.innerHTML = '<p class="text-slate-400 py-12 text-center text-base">目前尚無成交數據</p>';
+                }
+
+                const orderRes = await fetch(`${API_BASE}/stall-manager/orders/`, { headers: { 'Authorization': `Token ${token}` } });
+                const orders = await orderRes.json();
+                document.getElementById('stat-pending-orders').innerText = orders.filter(o => o.order_status === 'received').length;
+
+            } catch (e) { console.error("數據獲取失敗"); }
+        }
+
+        async function loadMyProducts() {
+            try {
+                const res = await fetch(`${API_BASE}/stall-manager/products/`, { headers: { 'Authorization': `Token ${token}` } });
+                allProducts = await res.json();
+                const container = document.getElementById('product-list');
+                container.innerHTML = allProducts.map(p => {
+                    const isCritical = p.stock_quantity < 5;
+                    return `
+                        <div class="bg-white border rounded-[2.5rem] p-8 shadow-sm ${isCritical ? 'stock-critical' : 'border-slate-100'} hover:shadow-xl transition-all">
+                            <div class="flex items-center space-x-5">
+                                <img src="${p.image_display || 'https://via.placeholder.com/80'}" class="w-20 h-20 object-cover rounded-2xl shadow-sm">
+                                <div class="flex-1">
+                                    <h3 class="font-black text-lg text-slate-900">${p.name}</h3>
+                                    <p class="text-sm ${isCritical ? 'text-red-500 font-black' : 'text-slate-500'}">庫存：${p.stock_quantity} ${p.unit}</p>
+                                    <p class="text-blue-600 font-black mt-2 text-lg">$${Math.round(p.price)}</p>
+                                </div>
+                                <button onclick="openModal(${p.id})" class="p-3 bg-slate-50 rounded-xl hover:bg-slate-100 text-xl">⚙️</button>
+                            </div>
+                        </div>`;
+                }).join('');
+            } catch (e) { console.error("產品載入失敗"); }
+        }
+
+        async function loadStallOrders() {
+            try {
+                const res = await fetch(`${API_BASE}/stall-manager/orders/`, { headers: { 'Authorization': `Token ${token}` } });
+                const orders = await res.json();
+                const container = document.getElementById('stall-order-list');
+                
+                container.innerHTML = orders.map(order => {
+                    let statusClass = "status-badge-received";
+                    let statusText = "備貨中";
+                    if(order.order_status === 'ready_for_pickup') { statusClass = "status-badge-ready"; statusText = "可取貨"; }
+                    if(order.order_status === 'completed') { statusClass = "status-badge-completed"; statusText = "已取貨"; }
+
+                    return `
+                        <div class="bg-white border border-slate-100 rounded-[2.5rem] p-10 shadow-sm">
+                            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                                <div class="space-y-1">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-xs font-black text-slate-300 tracking-wider">子訂單 #SUB-${order.id}</span>
+                                        <span class="text-xs font-bold text-blue-400">/ 主單 #${order.parent_order_id || order.parent_order}</span>
+                                    </div>
+                                    
+                                    <div class="flex items-center space-x-4 mt-2">
+                                        <h3 class="font-black text-3xl text-slate-900">${statusText}</h3>
+                                        <span class="px-4 py-1.5 rounded-full text-xs font-black uppercase ${statusClass}">${order.order_status}</span>
+                                    </div>
+
+                                    <div class="flex items-center text-slate-500 mt-2 bg-slate-50 w-fit px-4 py-1 rounded-full border border-slate-100">
+                                        <span class="text-sm font-bold mr-2">👤 顧客：</span>
+                                        <span class="text-base font-black text-slate-800">${order.customer_name || '載入中...'}</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex flex-wrap items-center gap-4">
+                                    <button onclick="toggleOrderDetail(${order.id})" class="bg-slate-100 px-8 py-3.5 rounded-2xl font-bold hover:bg-slate-200 transition-colors text-base">查看明細</button>
+                                    
+                                    <div class="relative">
+                                        <select onchange="updateOrderStatus(${order.id}, this.value)" class="appearance-none bg-blue-600 text-white pl-8 pr-12 py-3.5 rounded-2xl font-black cursor-pointer hover:bg-blue-700 transition-colors outline-none shadow-lg shadow-blue-100 text-base">
+                                            <option value="received" ${order.order_status === 'received' ? 'selected' : ''}>備貨中</option>
+                                            <option value="ready_for_pickup" ${order.order_status === 'ready_for_pickup' ? 'selected' : ''}>可取貨</option>
+                                            <option value="completed" ${order.order_status === 'completed' ? 'selected' : ''}>已取貨</option>
+                                        </select>
+                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-5 text-white">
+                                            <svg class="fill-current h-5 w-5" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="order-detail-${order.id}" class="hidden mt-10 pt-10 border-t">
+                                <div class="bg-slate-50 p-8 rounded-[2rem] text-lg" id="items-list-${order.id}">載入中...</div>
+                            </div>
+                        </div>`;
+                }).join('');
+            } catch (e) { console.error("訂單載入失敗"); }
+        }
+
+        async function toggleOrderDetail(orderId) {
+            const panel = document.getElementById(`order-detail-${orderId}`);
+            if (!panel.classList.contains('hidden')) {
+                panel.classList.add('hidden');
+                return;
+            }
+            panel.classList.remove('hidden');
+            try {
+                const res = await fetch(`${API_BASE}/order-items/?sub_order_id=${orderId}`, {
+                    headers: { 'Authorization': `Token ${token}` }
+                });
+                const items = await res.json();
+                const list = document.getElementById(`items-list-${orderId}`);
+                list.innerHTML = items.map(i => `
+                    <div class="flex justify-between py-3 border-b border-white last:border-0">
+                        <span class="font-bold text-slate-700">${i.product_name}</span>
+                        <span class="text-base font-mono bg-white px-3 py-1 rounded-lg shadow-sm font-black">x ${i.quantity}</span>
+                    </div>`).join('') || "無商品明細";
+            } catch (e) { document.getElementById(`items-list-${orderId}`).innerText = "載入失敗"; }
+        }
+
+        async function updateOrderStatus(orderId, newStatus) {
+            try {
+                const res = await fetch(`${API_BASE}/stall-manager/orders/${orderId}/update_status/`, {
+                    method: 'PATCH',
+                    headers: { 
+                        'Content-Type': 'application/json', 
+                        'Authorization': `Token ${token}` 
+                    },
+                    body: JSON.stringify({ status: newStatus })
+                });
+                
+                if (res.ok) {
+                    loadStallOrders(); 
+                    loadDashboardData();
+                } else {
+                    const err = await res.json();
+                    alert("狀態更新失敗：" + (err.detail || "伺服器拒絕更新"));
+                    loadStallOrders(); 
+                }
+            } catch (e) { alert("連線伺服器失敗"); }
+        }
+
+        async function loadStallSettings() {
+            try {
+                const res = await fetch(`${API_BASE}/stalls/?admin=true`, { headers: { 'Authorization': `Token ${token}` } });
+                const stalls = await res.json();
+                if (stalls.length > 0) {
+                    const myStall = stalls[0];
+                    currentStallId = myStall.id;
+                    document.getElementById('s-name').value = myStall.name || "";
+                    document.getElementById('s-phone').value = myStall.contact_phone || "";
+                    if (myStall.open_time) document.getElementById('s-open').value = myStall.open_time.slice(0,5);
+                    if (myStall.close_time) document.getElementById('s-close').value = myStall.close_time.slice(0,5);
+                    document.getElementById('s-active').checked = myStall.is_active;
+                }
+            } catch (e) { console.error("載入失敗"); }
+        }
+
+        async function loadCategories() {
+            try {
+                const res = await fetch(`${API_BASE}/categories/`);
+                const data = await res.json();
+                document.getElementById('p-category').innerHTML = data.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            } catch (e) { console.error("分類載入失敗"); }
+        }
+
+        function closeModal() { document.getElementById('product-modal').classList.add('hidden'); }
+
+        async function openModal(productId = null) {
+            await loadCategories();
+            document.getElementById('p-id').value = productId || "";
+            document.getElementById('modal-title').innerText = productId ? "修改商品詳情" : "新增現貨品項";
+            
+            if (productId) {
+                const p = allProducts.find(item => item.id === productId);
+                if (p) {
+                    document.getElementById('p-name').value = p.name;
+                    document.getElementById('p-price').value = Math.round(p.price);
+                    document.getElementById('p-unit').value = p.unit;
+                    document.getElementById('p-stock').value = p.stock_quantity;
+                    document.getElementById('p-desc').value = p.description || "";
+                    document.getElementById('p-category').value = p.category;
+                }
+            } else {
+                document.getElementById('product-form').reset();
+                document.getElementById('p-stock').value = 0;
+            }
+            document.getElementById('product-modal').classList.remove('hidden');
+        }
+
+        document.getElementById('product-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const pId = document.getElementById('p-id').value;
+            const url = pId ? `${API_BASE}/stall-manager/products/${pId}/` : `${API_BASE}/stall-manager/products/`;
+            const method = pId ? 'PATCH' : 'POST';
+            
+            const formData = new FormData();
+            formData.append('name', document.getElementById('p-name').value);
+            formData.append('price', document.getElementById('p-price').value);
+            formData.append('unit', document.getElementById('p-unit').value);
+            formData.append('stock_quantity', document.getElementById('p-stock').value);
+            formData.append('description', document.getElementById('p-desc').value);
+            formData.append('category', document.getElementById('p-category').value);
+            formData.append('status', 'on_shelf');
+            
+            const fileInput = document.getElementById('p-image-file');
+            if (fileInput && fileInput.files[0]) formData.append('image', fileInput.files[0]);
+
+            try {
+                const res = await fetch(url, { 
+                    method: method, 
+                    headers: { 'Authorization': `Token ${token}` }, 
+                    body: formData 
+                });
+                if (res.ok) { 
+                    closeModal(); 
+                    loadMyProducts(); 
+                } else {
+                    const err = await res.json();
+                    alert("儲存失敗：" + JSON.stringify(err));
+                }
+            } catch (e) { alert("系統連線失敗"); }
+        };
+
+        document.getElementById('stall-settings-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const data = {
+                name: document.getElementById('s-name').value,
+                contact_phone: document.getElementById('s-phone').value,
+                open_time: document.getElementById('s-open').value,
+                close_time: document.getElementById('s-close').value,
+                is_active: document.getElementById('s-active').checked
+            };
+            const res = await fetch(`${API_BASE}/stalls/${currentStallId}/`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Token ${token}` },
+                body: JSON.stringify(data)
+            });
+            if (res.ok) alert("✅ 店鋪設定已儲存");
+        };
+    </script>
+</body>
+</html>
