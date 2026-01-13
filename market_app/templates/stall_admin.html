@@ -5,21 +5,21 @@
     <title>攤商營運管理系統 - 我的市場</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* 庫存預警：呼吸燈效果 */
+        /* 庫存預警動畫：當庫存不足 5 件時，觸發紅色呼吸燈邊框效果 */
         @keyframes pulse-red {
             0%, 100% { border-color: #ef4444; box-shadow: 0 0 0 0px rgba(239, 68, 68, 0.4); }
             50% { border-color: #fca5a5; box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
         }
         .stock-critical { animation: pulse-red 2s infinite; border-width: 2px !important; }
         
-        /* 隱藏滾動條但保留功能 */
+        /* 隱藏滾動條但保留滾動功能，保持介面整潔 */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-        /* 狀態標籤樣式 */
-        .status-badge-received { background-color: #fef3c7; color: #d97706; } /* 備貨中 */
-        .status-badge-ready { background-color: #dcfce7; color: #16a34a; }    /* 可取貨 */
-        .status-badge-completed { background-color: #f1f5f9; color: #64748b; } /* 已取貨 */
+        /* 根據訂單狀態定義不同的顏色標籤 */
+        .status-badge-received { background-color: #fef3c7; color: #d97706; } /* 備貨中 (黃色) */
+        .status-badge-ready { background-color: #dcfce7; color: #16a34a; }    /* 可取貨 (綠色) */
+        .status-badge-completed { background-color: #f1f5f9; color: #64748b; } /* 已取貨 (灰色) */
         
         body { font-family: 'PingFang TC', 'Heiti TC', 'Microsoft JhengHei', sans-serif; }
     </style>
@@ -172,21 +172,30 @@
     </div>
 
     <script>
+        // 設定 API 基礎路徑與身份驗證 Token
         const API_BASE = "https://databaseapi-15o1.onrender.com/api";
         const token = localStorage.getItem('token');
         let currentStallId = null;
         let allProducts = [];
 
+        /**
+         * 頁面載入初始化
+         */
         window.onload = async () => {
+            // 每秒更新即時時鐘
             setInterval(() => {
                 const el = document.getElementById('live-time');
                 if (el) el.innerText = new Date().toLocaleTimeString();
             }, 1000);
             
-            await loadStallSettings();
-            switchTab('dashboard');
+            await loadStallSettings(); // 首先獲取攤商 ID
+            switchTab('dashboard');   // 預設進入數據看板
         };
 
+        /**
+         * 分頁切換邏輯
+         * @param {string} tab - 目標分頁 ID
+         */
         function switchTab(tab) {
             const tabs = ['dashboard', 'products', 'orders', 'settings'];
             tabs.forEach(t => {
@@ -196,17 +205,22 @@
                 if (btn) btn.className = "px-7 py-3 rounded-xl font-bold transition-all text-base text-slate-500 hover:text-slate-800";
             });
 
+            // 顯示當前選中的區域
             const activeSection = document.getElementById(`${tab}-section`);
             const activeBtn = document.getElementById(`tab-${tab}`);
             if (activeSection) activeSection.classList.remove('hidden');
             if (activeBtn) activeBtn.className = "px-7 py-3 rounded-xl font-bold transition-all text-base bg-white shadow-lg text-blue-600";
             
+            // 根據分頁載入對應資料
             if (tab === 'dashboard') loadDashboardData();
             if (tab === 'products') loadMyProducts();
             if (tab === 'orders') loadStallOrders();
             if (tab === 'settings') loadStallSettings();
         }
 
+        /**
+         * 載入數據看板資訊 (營收、熱銷排行)
+         */
         async function loadDashboardData() {
             if (!currentStallId) return;
             try {
@@ -214,9 +228,12 @@
                     headers: { 'Authorization': `Token ${token}` }
                 });
                 const data = await res.json();
+                
+                // 更新數字統計
                 document.getElementById('stat-today-revenue').innerText = `$${Math.round(data.today_revenue || 0)}`;
                 document.getElementById('stat-total-revenue').innerText = `$${Math.round(data.total_revenue || 0)}`;
                 
+                // 渲染熱銷排行進度條
                 const topList = document.getElementById('top-products-list');
                 if (data.top_products && data.top_products.length > 0) {
                     const maxQty = Math.max(...data.top_products.map(p => p.total_qty), 1);
@@ -237,20 +254,25 @@
                     topList.innerHTML = '<p class="text-slate-400 py-12 text-center text-base">目前尚無成交數據</p>';
                 }
 
+                // 獲取待處理訂單數量
                 const orderRes = await fetch(`${API_BASE}/stall-manager/orders/`, { headers: { 'Authorization': `Token ${token}` } });
                 const orders = await orderRes.json();
                 document.getElementById('stat-pending-orders').innerText = orders.filter(o => o.order_status === 'received').length;
 
-            } catch (e) { console.error("數據獲取失敗"); }
+            } catch (e) { console.error("Dashboard 資料獲取失敗"); }
         }
 
+        /**
+         * 載入攤商擁有的商品與庫存
+         */
         async function loadMyProducts() {
             try {
                 const res = await fetch(`${API_BASE}/stall-manager/products/`, { headers: { 'Authorization': `Token ${token}` } });
                 allProducts = await res.json();
                 const container = document.getElementById('product-list');
+                
                 container.innerHTML = allProducts.map(p => {
-                    const isCritical = p.stock_quantity < 5;
+                    const isCritical = p.stock_quantity < 5; // 定義庫存警告門檻
                     return `
                         <div class="bg-white border rounded-[2.5rem] p-8 shadow-sm ${isCritical ? 'stock-critical' : 'border-slate-100'} hover:shadow-xl transition-all">
                             <div class="flex items-center space-x-5">
@@ -264,9 +286,12 @@
                             </div>
                         </div>`;
                 }).join('');
-            } catch (e) { console.error("產品載入失敗"); }
+            } catch (e) { console.error("產品清單載入失敗"); }
         }
 
+        /**
+         * 載入攤商專屬的子訂單列表
+         */
         async function loadStallOrders() {
             try {
                 const res = await fetch(`${API_BASE}/stall-manager/orders/`, { headers: { 'Authorization': `Token ${token}` } });
@@ -274,6 +299,7 @@
                 const container = document.getElementById('stall-order-list');
                 
                 container.innerHTML = orders.map(order => {
+                    // 狀態 UI 分支
                     let statusClass = "status-badge-received";
                     let statusText = "備貨中";
                     if(order.order_status === 'ready_for_pickup') { statusClass = "status-badge-ready"; statusText = "可取貨"; }
@@ -293,7 +319,7 @@
                                     </div>
                                     <div class="flex items-center text-slate-500 mt-2 bg-slate-50 w-fit px-4 py-1 rounded-full border border-slate-100">
                                         <span class="text-sm font-bold mr-2">👤 顧客：</span>
-                                        <span class="text-base font-black text-slate-800">${order.customer_name || '載入中...'}</span>
+                                        <span class="text-base font-black text-slate-800">${order.customer_name || '系統查詢中...'}</span>
                                     </div>
                                 </div>
                                 <div class="flex flex-wrap items-center gap-4">
@@ -318,6 +344,9 @@
             } catch (e) { console.error("訂單載入失敗"); }
         }
 
+        /**
+         * 展開/收合訂單詳細商品清單
+         */
         async function toggleOrderDetail(orderId) {
             const panel = document.getElementById(`order-detail-${orderId}`);
             if (!panel.classList.contains('hidden')) {
@@ -326,6 +355,7 @@
             }
             panel.classList.remove('hidden');
             try {
+                // 向後端請求子訂單內的商品項目明細
                 const res = await fetch(`${API_BASE}/order-items/?sub_order_id=${orderId}`, {
                     headers: { 'Authorization': `Token ${token}` }
                 });
@@ -336,9 +366,12 @@
                         <span class="font-bold text-slate-700">${i.product_name}</span>
                         <span class="text-base font-mono bg-white px-3 py-1 rounded-lg shadow-sm font-black">x ${i.quantity}</span>
                     </div>`).join('') || "無商品明細";
-            } catch (e) { document.getElementById(`items-list-${orderId}`).innerText = "載入失敗"; }
+            } catch (e) { document.getElementById(`items-list-${orderId}`).innerText = "資料載入失敗"; }
         }
 
+        /**
+         * 更新子訂單狀態（例如從 備貨中 -> 可取貨）
+         */
         async function updateOrderStatus(orderId, newStatus) {
             try {
                 const res = await fetch(`${API_BASE}/stall-manager/orders/${orderId}/update_status/`, {
@@ -347,14 +380,18 @@
                     body: JSON.stringify({ status: newStatus })
                 });
                 if (res.ok) {
-                    loadStallOrders(); 
-                    loadDashboardData();
+                    loadStallOrders();    // 重新載入列表刷新 UI
+                    loadDashboardData();  // 刷新統計數字
                 }
-            } catch (e) { alert("連線伺服器失敗"); }
+            } catch (e) { alert("無法連線伺服器進行更新"); }
         }
 
+        /**
+         * 讀取店鋪基本資料
+         */
         async function loadStallSettings() {
             try {
+                // ?admin=true 參數通常由後端用來篩選出該管理員所屬的攤商
                 const res = await fetch(`${API_BASE}/stalls/?admin=true`, { headers: { 'Authorization': `Token ${token}` } });
                 const stalls = await res.json();
                 if (stalls.length > 0) {
@@ -362,23 +399,31 @@
                     currentStallId = myStall.id;
                     document.getElementById('s-name').value = myStall.name || "";
                     document.getElementById('s-phone').value = myStall.contact_phone || "";
+                    // 格式化時間：08:00:00 -> 08:00
                     if (myStall.open_time) document.getElementById('s-open').value = myStall.open_time.slice(0,5);
                     if (myStall.close_time) document.getElementById('s-close').value = myStall.close_time.slice(0,5);
                     document.getElementById('s-active').checked = myStall.is_active;
                 }
-            } catch (e) { console.error("載入失敗"); }
+            } catch (e) { console.error("店鋪設定載入失敗"); }
         }
 
+        /**
+         * 載入全域分類清單 (用於新增商品時的下拉選單)
+         */
         async function loadCategories() {
             try {
                 const res = await fetch(`${API_BASE}/categories/`);
                 const data = await res.json();
                 document.getElementById('p-category').innerHTML = data.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-            } catch (e) { console.error("分類載入失敗"); }
+            } catch (e) { console.error("商品分類載入失敗"); }
         }
 
         function closeModal() { document.getElementById('product-modal').classList.add('hidden'); }
 
+        /**
+         * 開啟新增/編輯商品的彈窗
+         * @param {number|null} productId - 若傳入 ID 則為編輯模式，否則為新增模式
+         */
         async function openModal(productId = null) {
             await loadCategories();
             document.getElementById('p-id').value = productId || "";
@@ -393,7 +438,7 @@
                     document.getElementById('p-stock').value = p.stock_quantity;
                     document.getElementById('p-desc').value = p.description || "";
                     document.getElementById('p-category').value = p.category;
-                    document.getElementById('p-image-url').value = p.image_url || ""; // 填入舊網址
+                    document.getElementById('p-image-url').value = p.image_url || "";
                 }
             } else {
                 document.getElementById('product-form').reset();
@@ -402,13 +447,15 @@
             document.getElementById('product-modal').classList.remove('hidden');
         }
 
+        /**
+         * 商品表單提交處理 (POST/PATCH)
+         */
         document.getElementById('product-form').onsubmit = async (e) => {
             e.preventDefault();
             const pId = document.getElementById('p-id').value;
             const url = pId ? `${API_BASE}/stall-manager/products/${pId}/` : `${API_BASE}/stall-manager/products/`;
             const method = pId ? 'PATCH' : 'POST';
             
-            // 使用 JSON 格式傳送資料，包含圖片網址
             const data = {
                 name: document.getElementById('p-name').value,
                 price: document.getElementById('p-price').value,
@@ -416,7 +463,7 @@
                 stock_quantity: document.getElementById('p-stock').value,
                 description: document.getElementById('p-desc').value,
                 category: document.getElementById('p-category').value,
-                image_url: document.getElementById('p-image-url').value, // 傳送圖片網址
+                image_url: document.getElementById('p-image-url').value,
                 status: 'on_shelf'
             };
 
@@ -431,14 +478,17 @@
                 });
                 if (res.ok) { 
                     closeModal(); 
-                    loadMyProducts(); 
+                    loadMyProducts(); // 重新整理清單
                 } else {
                     const err = await res.json();
                     alert("儲存失敗：" + JSON.stringify(err));
                 }
-            } catch (e) { alert("系統連線失敗"); }
+            } catch (e) { alert("系統發生異常，請檢查連線"); }
         };
 
+        /**
+         * 儲存店鋪設定變更
+         */
         document.getElementById('stall-settings-form').onsubmit = async (e) => {
             e.preventDefault();
             const data = {
@@ -453,7 +503,7 @@
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Token ${token}` },
                 body: JSON.stringify(data)
             });
-            if (res.ok) alert("✅ 店鋪設定已儲存");
+            if (res.ok) alert("✅ 店鋪設定已成功儲存");
         };
     </script>
 </body>

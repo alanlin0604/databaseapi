@@ -40,21 +40,30 @@
             </button>
         </div>
         
-        </div>
+    </div>
 
     <script>
+        // 設定 API 基礎路徑
         const API_BASE = "https://databaseapi-15o1.onrender.com/api";
+        // 解析網址參數中的 order id (例如: ?id=123)
         const urlParams = new URLSearchParams(window.location.search);
         const orderId = urlParams.get('id');
+        // 從本地儲存取得身份驗證 Token
         const token = localStorage.getItem('token'); 
 
+        /**
+         * 頁面初始化：檢查權限並讀取訂單詳細金額
+         */
         async function initPayment() {
+            // 安全檢查：若無登入則跳轉
             if (!token) { window.location.href = "/login/"; return; } 
+            // 參數檢查：若網址無 ID 則報錯
             if (!orderId) { alert("無效的訂單編號"); return; }
             
             document.getElementById('display-order-id').innerText = `#${orderId}`;
             
             try {
+                // 向後端請求該筆訂單的詳細資料
                 const res = await fetch(`${API_BASE}/parent-orders/${orderId}/`, {
                     headers: { 'Authorization': `Token ${token}` }
                 });
@@ -62,6 +71,7 @@
                 if (!res.ok) throw new Error("權限不足或訂單不存在");
                 
                 const order = await res.json();
+                // 格式化金額，移除小數點
                 const amount = parseFloat(order.final_paid_amount).toFixed(0);
                 document.getElementById('display-amount').innerText = `$${amount}`;
             } catch (error) {
@@ -70,10 +80,16 @@
             }
         }
 
+        /**
+         * 處理付款邏輯
+         * @param {string} method - 支付方式代碼 (例如: 'CASH')
+         */
         async function pay(method) {
+            // 二次確認，避免誤觸
             if(!confirm(`確認使用 ${method} 進行支付？`)) return;
 
             try {
+                // 使用 PATCH 方法更新訂單狀態為「已付款 (paid)」並記錄付款方式
                 const response = await fetch(`${API_BASE}/parent-orders/${orderId}/`, {
                     method: 'PATCH',
                     headers: { 
@@ -88,6 +104,7 @@
 
                 if (response.ok) {
                     alert("🎉 付款成功！請前往市場領取您的商品。");
+                    // 付款成功後跳轉至我的訂單頁面
                     window.location.href = "/my-orders/"; 
                 } else {
                     alert("付款失敗，請檢查網路狀態");
@@ -97,6 +114,7 @@
             }
         }
 
+        // 頁面載入時啟動初始化
         window.onload = initPayment;
     </script>
 </body>

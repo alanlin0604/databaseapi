@@ -9,14 +9,17 @@
         body { font-family: 'PingFang TC', 'Heiti TC', 'Microsoft JhengHei', sans-serif; }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen text-lg"> <nav class="bg-blue-600 p-6 text-white shadow-lg"> 
+<body class="bg-gray-100 min-h-screen text-lg"> 
+    <nav class="bg-blue-600 p-6 text-white shadow-lg"> 
         <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-3xl font-black tracking-tight">🛒 我的購物車</h1> <a href="/" class="text-xl font-bold hover:underline bg-white/10 px-6 py-2 rounded-xl transition">← 返回首頁</a>
+            <h1 class="text-3xl font-black tracking-tight">🛒 我的購物車</h1> 
+            <a href="/" class="text-xl font-bold hover:underline bg-white/10 px-6 py-2 rounded-xl transition">← 返回首頁</a>
         </div>
     </nav>
 
     <div class="container mx-auto p-8">
-        <div class="bg-white rounded-[2.5rem] shadow-2xl p-10"> <div id="cart-container" class="overflow-x-auto">
+        <div class="bg-white rounded-[2.5rem] shadow-2xl p-10"> 
+            <div id="cart-container" class="overflow-x-auto">
                 <p class="text-center py-20 text-2xl text-gray-400 font-bold">正在讀取購物清單...</p>
             </div>
 
@@ -42,11 +45,16 @@
     </div>
 
     <script>
+        // 設定 API 基礎路徑與從本地儲存讀取身份驗證 Token
         const API_BASE = "https://databaseapi-15o1.onrender.com/api";
         const token = localStorage.getItem('token');
 
+        /**
+         * 抓取並渲染購物車資料
+         */
         async function fetchCart() {
             try {
+                // 平行發送三個請求：購物車內容、商品清單、使用者資料
                 const [cartRes, prodRes, userRes] = await Promise.all([
                     fetch(`${API_BASE}/cart/`, { headers: { 'Authorization': `Token ${token}` } }),
                     fetch(`${API_BASE}/products/`),
@@ -57,18 +65,22 @@
                 const products = await prodRes.json();
                 const userData = await userRes.json();
 
+                // 更新介面上的可用點數
                 document.getElementById('user-points').innerText = userData.current_points;
 
                 const container = document.getElementById('cart-container');
+                // 若購物車為空則顯示提示訊息
                 if (!cartData.length) {
                     container.innerHTML = '<p class="text-center py-20 text-3xl text-gray-300 font-black">您的購物車目前是空的</p>';
                     return;
                 }
 
                 let total = 0;
+                // 初始化表格標題
                 let html = `<table class="w-full text-left min-w-[700px]">
                     <tr class="text-gray-400 text-lg border-b-2"><th class="py-4 px-2">商品項目</th><th class="text-center">單價</th><th class="text-center">數量</th><th class="text-center">小計</th><th></th></tr>`;
 
+                // 遍歷購物車項目並匹配產品詳細資訊
                 cartData.forEach(item => {
                     const product = products.find(p => p.id == item.product);
                     if (product) {
@@ -94,28 +106,45 @@
                     }
                 });
 
+                // 渲染完整表格並更新總價
                 container.innerHTML = html + `</table>`;
                 document.getElementById('total-price').innerText = `$${Math.round(total)}`;
-            } catch (e) { console.error(e); }
+            } catch (e) { console.error("讀取購物車失敗:", e); }
         }
 
+        /**
+         * 更新商品數量
+         * @param {number} id - 購物車項目的 ID
+         * @param {number} qty - 目標數量
+         */
         async function updateQty(id, qty) {
+            // 如果數量小於 1，執行刪除邏輯
             if (qty < 1) return deleteItem(id);
             await fetch(`${API_BASE}/cart/${id}/`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Token ${token}` },
                 body: JSON.stringify({ quantity: qty })
             });
-            fetchCart();
+            fetchCart(); // 重新讀取資料刷新畫面
         }
 
+        /**
+         * 刪除購物車商品
+         * @param {number} id - 購物車項目的 ID
+         */
         async function deleteItem(id) {
             if (confirm("確定要從購物車移除這項商品嗎？")) {
-                await fetch(`${API_BASE}/cart/${id}/`, { method: 'DELETE', headers: { 'Authorization': `Token ${token}` } });
-                fetchCart();
+                await fetch(`${API_BASE}/cart/${id}/`, { 
+                    method: 'DELETE', 
+                    headers: { 'Authorization': `Token ${token}` } 
+                });
+                fetchCart(); // 重新讀取資料刷新畫面
             }
         }
 
+        /**
+         * 執行結帳流程
+         */
         async function checkout() {
             const points = document.getElementById('input-points').value || 0;
             const res = await fetch(`${API_BASE}/cart/checkout/`, {
@@ -126,10 +155,15 @@
             const result = await res.json();
             if (res.ok) {
                 alert("訂單已成立，準備前往付款！");
+                // 結帳成功後跳轉至付款頁面，並攜帶訂單 ID
                 window.location.href = `/payment/?id=${result.order_id}`;
-            } else alert(result.detail);
+            } else {
+                // 顯示後端傳回的錯誤訊息（例如點數不足或庫存不足）
+                alert(result.detail || "結帳失敗，請稍後再試");
+            }
         }
 
+        // 頁面載入完成後自動執行讀取
         window.onload = fetchCart;
     </script>
 </body>

@@ -5,17 +5,21 @@
     <title>會員登入/註冊 - 線上市場</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Ensuring a clean, bold font for the entire page */
+        /* 確保全域字體統一為清晰的黑體組合 */
         body { font-family: 'PingFang TC', 'Heiti TC', 'Microsoft JhengHei', sans-serif; }
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen flex items-center justify-center p-8">
-    <div class="bg-white w-full max-w-2xl rounded-[4rem] shadow-2xl overflow-hidden"> <div class="flex border-b-2 border-gray-100">
+    
+    <div class="bg-white w-full max-w-2xl rounded-[4rem] shadow-2xl overflow-hidden"> 
+        
+        <div class="flex border-b-2 border-gray-100">
             <button id="tab-login" onclick="switchTab('login')" class="flex-1 py-8 text-3xl font-black text-blue-600 border-b-[10px] border-blue-600 transition-all">登入</button>
             <button id="tab-register" onclick="switchTab('register')" class="flex-1 py-8 text-3xl font-black text-gray-400 hover:text-gray-600 transition-all">註冊</button>
         </div>
 
-        <div class="p-16"> <form id="login-form" onsubmit="handleAuth(event, 'login')" class="space-y-10">
+        <div class="p-16"> 
+            <form id="login-form" onsubmit="handleAuth(event, 'login')" class="space-y-10">
                 <h2 class="text-5xl font-black text-gray-800 mb-12 text-center">歡迎回來</h2>
                 
                 <div class="space-y-6">
@@ -65,28 +69,45 @@
     </div>
 
     <script>
+        // 設定 API 基礎連線路徑
         const API_BASE = "https://databaseapi-15o1.onrender.com/api";
 
+        /**
+         * 切換「登入」與「註冊」面板的 UI 邏輯
+         * @param {string} type - 'login' 或 'register'
+         */
         function switchTab(type) {
             const isLogin = type === 'login';
+            
+            // 切換表單的顯示/隱藏
             document.getElementById('login-form').classList.toggle('hidden', !isLogin);
             document.getElementById('register-form').classList.toggle('hidden', isLogin);
             
-            // UI Style Update
+            // 更新頁籤按鈕的樣式 (顏色與底線)
             const tabLogin = document.getElementById('tab-login');
             const tabReg = document.getElementById('tab-register');
             
             if (isLogin) {
+                // 登入狀態樣式
                 tabLogin.className = "flex-1 py-8 text-3xl font-black text-blue-600 border-b-[10px] border-blue-600 transition-all";
                 tabReg.className = "flex-1 py-8 text-3xl font-black text-gray-400 hover:text-gray-600 transition-all";
             } else {
+                // 註冊狀態樣式
                 tabLogin.className = "flex-1 py-8 text-3xl font-black text-gray-400 hover:text-gray-600 transition-all";
                 tabReg.className = "flex-1 py-8 text-3xl font-black text-green-600 border-b-[10px] border-green-600 transition-all";
             }
         }
 
+        /**
+         * 處理身份驗證請求 (登入或註冊)
+         * @param {Event} event - 表單提交事件
+         * @param {string} type - 操作類型 ('login' 或 'register')
+         */
         async function handleAuth(event, type) {
+            // 阻擋表單預設的重整跳轉行為
             event.preventDefault();
+            
+            // 根據類型封裝資料物件
             const data = type === 'login' 
                 ? { 
                     username: document.getElementById('login-user').value, 
@@ -99,20 +120,25 @@
                   };
 
             try {
+                // 發送請求至後端 API
                 const res = await fetch(`${API_BASE}/${type}/`, { 
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json' }, 
                     body: JSON.stringify(data) 
                 });
+                
                 const result = await res.json();
                 
                 if (res.ok) { 
+                    // 成功：存儲 Token 並導回首頁
                     localStorage.setItem('token', result.token); 
                     window.location.href = "/"; 
                 } else { 
-                    alert("操作失敗：" + (result.detail || "請檢查資料是否正確")); 
+                    // 失敗：顯示錯誤原因
+                    alert("操作失敗：" + (result.detail || "請檢查帳號密碼是否正確")); 
                 }
             } catch (err) {
+                // 網路或伺服器異常處理
                 alert("連線伺服器失敗，請稍後再試");
             }
         }

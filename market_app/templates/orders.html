@@ -5,6 +5,7 @@
     <title>歷史訂單 - 線上市場</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        /* 統一字體設定，確保在不同裝置上都有良好的閱讀體驗 */
         body { font-family: 'PingFang TC', 'Heiti TC', 'Microsoft JhengHei', sans-serif; }
     </style>
 </head>
@@ -23,36 +24,52 @@
     </div>
 
     <script>
+        // 設定 API 基礎連線路徑與身份驗證 Token
         const API_BASE = "https://databaseapi-15o1.onrender.com/api";
         const token = localStorage.getItem('token');
 
+        // 權限檢查：未登入者直接引導至登入頁面
         if (!token) {
             alert("請先登入會員以查看訂單紀錄");
             window.location.href = "/login/";
         }
 
+        /**
+         * 異步載入特定訂單的商品明細
+         * @param {number} orderId - 父訂單 ID
+         * @param {string} elementId - 要渲染明細的容器 ID
+         */
         async function loadOrderItems(orderId, elementId) {
             try {
+                // 向後端請求該筆訂單的所有商品項目
                 const res = await fetch(`${API_BASE}/order-items/?parent_id=${orderId}`, {
                     headers: { 'Authorization': `Token ${token}` }
                 });
                 const items = await res.json();
                 const listEl = document.getElementById(elementId);
                 if (!listEl) return;
+
+                // 渲染商品清單 HTML
                 listEl.innerHTML = `
                     <div class="bg-gray-50 p-6 rounded-2xl mt-4 border border-gray-200">
                         <p class="text-base font-black text-gray-400 mb-4 uppercase tracking-widest">商品明細</p>
                         ${items.map(item => `
                             <div class="flex justify-between text-xl py-3 border-b border-gray-200 last:border-0">
-                                <span class="text-gray-800 font-bold">${item.product_name || '未知商品'} <span class="text-gray-400 ml-2">x ${item.quantity}</span></span>
+                                <span class="text-gray-800 font-bold">
+                                    ${item.product_name || '未知商品'} 
+                                    <span class="text-gray-400 ml-2">x ${item.quantity}</span>
+                                </span>
                                 <span class="font-black text-gray-900">$${Math.round(item.unit_price_snapshot * item.quantity)}</span>
                             </div>
                         `).join('')}
                     </div>
                 `;
-            } catch (err) { console.error(err); }
+            } catch (err) { console.error("載入明細失敗:", err); }
         }
 
+        /**
+         * 抓取所有父訂單紀錄並渲染
+         */
         async function fetchOrders() {
             try {
                 const response = await fetch(`${API_BASE}/parent-orders/`, {
@@ -62,24 +79,30 @@
                 const container = document.getElementById('order-container');
                 container.innerHTML = '';
 
+                // 若無訂單時的處理
                 if (orders.length === 0) {
                     container.innerHTML = '<p class="text-center py-20 text-gray-500 text-2xl font-bold">尚無任何訂單紀錄</p>';
                     return;
                 }
 
+                // 排序：將最新的訂單放在最上方
                 orders.sort((a, b) => b.id - a.id).forEach(order => {
+                    // 根據訂單狀態設定 UI 樣式
                     const isPaid = order.order_status === 'paid';
                     const statusText = isPaid ? '✅ 已付款完成' : '⏳ 訂單待處理';
                     const statusClass = isPaid ? 'text-green-600' : 'text-amber-600';
                     const borderClass = isPaid ? 'border-green-500' : 'border-amber-500';
 
+                    // 構建訂單卡片 HTML
                     container.innerHTML += `
                         <div class="bg-white rounded-[2.5rem] shadow-xl p-10 mb-10 border-l-[16px] ${borderClass} transition-all hover:shadow-2xl">
                             <div class="flex justify-between items-center mb-6">
                                 <span class="text-gray-400 text-lg font-mono font-bold">訂單編號 #${order.id} | ${new Date(order.order_date).toLocaleString()}</span>
                                 <span class="text-2xl font-black ${statusClass}">${statusText}</span>
                             </div>
+
                             <div id="items-container-${order.id}" class="mb-6"></div>
+
                             <div class="flex justify-between items-end pt-8 border-t-2 border-gray-100">
                                 <div class="text-gray-500 text-lg font-bold flex flex-col space-y-2">
                                     <span class="bg-gray-100 px-4 py-2 rounded-lg w-fit">付款方式：${order.payment_method || '未設定'}</span>
@@ -94,10 +117,16 @@
                             </div>
                         </div>
                     `;
+                    // 卡片架構產生後，立即觸發載入該訂單的詳細商品
                     loadOrderItems(order.id, `items-container-${order.id}`);
                 });
-            } catch (err) { console.error(err); }
+            } catch (err) { 
+                console.error("抓取訂單失敗:", err);
+                document.getElementById('order-container').innerHTML = '<p class="text-center py-20 text-red-500">無法連線至伺服器，請稍後再試</p>';
+            }
         }
+
+        // 當頁面載入完成時執行
         window.onload = fetchOrders;
     </script>
 </body>

@@ -6,15 +6,17 @@
     <title>我的線上市場 - 主介面</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        /* 定義微小的跳動動畫，用於訂單追蹤圖示 */
         @keyframes subtle-bounce {
             0%, 100% { transform: translateY(0); }
             50% { transform: translateY(-3px); }
         }
         .animate-pickup { animation: subtle-bounce 2s infinite; }
-        /* 統一全域字體為更清晰的黑體組合 */
+        
+        /* 統一全域字體為更清晰的黑體組合，提升閱讀體驗 */
         body { font-family: 'PingFang TC', 'Heiti TC', 'Microsoft JhengHei', sans-serif; }
         
-        /* 自定義 Toast 動畫 */
+        /* 自定義 Toast 彈出訊息的過渡動畫 */
         #toast-container {
             transition: opacity 0.3s ease, transform 0.3s ease;
         }
@@ -118,14 +120,19 @@
     </div>
 
     <script>
+        // 設定 API 基礎路徑與身份驗證 Token
         const API_BASE = "https://databaseapi-15o1.onrender.com/api";
         const token = localStorage.getItem('token');
         
+        // 全域狀態管理：記錄當前篩選條件
         let currentSelectedStall = null;
         let currentSelectedCategory = null;
         let categoriesData = [];
         let stallsData = [];
 
+        /**
+         * 顯示 Toast 通知訊息
+         */
         function showToast(message) {
             const toast = document.getElementById('toast-container');
             toast.querySelector('span.text-lg').innerText = message;
@@ -137,6 +144,9 @@
             }, 2000);
         }
 
+        /**
+         * 驗證使用者登入狀態並更新導覽列 UI
+         */
         async function checkAuth() {
             if (!token || token === "null") return;
             try {
@@ -150,12 +160,19 @@
                     document.getElementById('nav-username').innerText = user.username;
                     document.getElementById('nav-points').innerText = user.current_points;
                 }
-            } catch (e) { console.error("Auth check failed", e); }
+            } catch (e) { console.error("身份驗證檢查失敗", e); }
         }
 
+        /**
+         * 根據篩選條件抓取商品資料並渲染
+         * @param {number|null} stallId - 攤商 ID
+         * @param {number|null} categoryId - 分類 ID
+         */
         async function fetchProducts(stallId = null, categoryId = null) {
             currentSelectedStall = stallId;
             currentSelectedCategory = categoryId;
+            
+            // 重新渲染左側清單以更新選取狀態樣式
             renderStallList();
             renderCategoryList();
 
@@ -169,7 +186,11 @@
             try {
                 const res = await fetch(url);
                 const data = await res.json();
-                container.innerHTML = data.length === 0 ? `<p class="col-span-full text-center py-20 text-gray-400 text-xl italic">目前該分類下無商品</p>` : data.map(p => `
+                
+                // 渲染商品卡片
+                container.innerHTML = data.length === 0 ? 
+                    `<p class="col-span-full text-center py-20 text-gray-400 text-xl italic">目前該分類下無商品</p>` : 
+                    data.map(p => `
                     <div class="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden hover:shadow-2xl transition-all group">
                         <div class="relative overflow-hidden aspect-[4/3]">
                             <img src="${p.image_display || p.image_url || 'https://via.placeholder.com/400x300?text=無圖片'}" 
@@ -189,9 +210,14 @@
                         </div>
                     </div>
                 `).join('');
-            } catch (e) { container.innerHTML = `<p class="col-span-full text-center text-red-500 text-lg">服務忙碌中，請稍後再試</p>`; }
+            } catch (e) { 
+                container.innerHTML = `<p class="col-span-full text-center text-red-500 text-lg">服務忙碌中，請稍後再試</p>`; 
+            }
         }
 
+        /**
+         * 初始化基礎資料（攤商與分類清單）
+         */
         async function initData() {
             try {
                 const [stallRes, catRes] = await Promise.all([
@@ -202,9 +228,12 @@
                 categoriesData = await catRes.json();
                 renderStallList();
                 renderCategoryList();
-            } catch (e) { console.error("初始化失敗", e); }
+            } catch (e) { console.error("資料初始化失敗", e); }
         }
 
+        /**
+         * 渲染側邊欄攤商清單
+         */
         function renderStallList() {
             const list = document.getElementById('stall-list');
             const allBtnStyle = currentSelectedStall === null ? "bg-blue-600 text-white shadow-lg scale-105" : "hover:bg-blue-50 text-blue-600 border border-blue-100";
@@ -217,6 +246,9 @@
             list.innerHTML = html;
         }
 
+        /**
+         * 渲染側邊欄分類清單
+         */
         function renderCategoryList() {
             const list = document.getElementById('category-list');
             const allBtnStyle = currentSelectedCategory === null ? "bg-green-600 text-white shadow-lg scale-105" : "hover:bg-green-50 text-green-600 border border-green-100";
@@ -229,14 +261,19 @@
             list.innerHTML = html;
         }
 
+        /**
+         * 抓取最新的訂單狀態以顯示在追蹤小工具中
+         */
         async function fetchLatestOrder() {
             if (!token) return;
             try {
                 const res = await fetch(`${API_BASE}/parent-orders/`, { headers: { 'Authorization': `Token ${token}` } });
                 const orders = await res.json();
                 if (orders.length > 0) {
-                    const order = orders[0];
+                    const order = orders[0]; // 取得最新一筆訂單
                     const widget = document.getElementById('order-tracking-widget');
+                    
+                    // 解析子訂單狀態（因為一筆大訂單可能包含多個攤商）
                     let subHtml = order.sub_orders.map(so => {
                         let statusLabel = "";
                         let statusClass = "";
@@ -249,24 +286,43 @@
                         return `<div class="flex justify-between items-center bg-white p-4 rounded-2xl border border-gray-100 mb-3 shadow-sm"><span class="text-base font-black text-gray-700">🏪 ${so.stall_name}</span><span class="px-4 py-1.5 rounded-full text-xs font-black border ${statusClass}">${statusLabel}</span></div>`;
                     }).join('');
 
-                    document.getElementById('widget-content').innerHTML = `<div class="bg-white/90 backdrop-blur-lg border border-white rounded-[2.5rem] p-8 shadow-2xl"><div class="flex justify-between items-center mb-6"><div><h2 class="font-black text-xl text-gray-800 flex items-center"><span class="animate-pickup mr-3">🛵</span> 訂單狀態追蹤</h2><p class="text-xs text-gray-400 mt-1 font-mono">ORDER #${order.id} | ${new Date(order.order_date).toLocaleString()}</p></div><a href="/my-orders/" class="text-base text-blue-600 font-black hover:underline underline-offset-4">查看詳情 →</a></div><div class="grid grid-cols-1 gap-1">${subHtml}</div></div>`;
+                    // 渲染追蹤小工具 HTML
+                    document.getElementById('widget-content').innerHTML = `
+                        <div class="bg-white/90 backdrop-blur-lg border border-white rounded-[2.5rem] p-8 shadow-2xl">
+                            <div class="flex justify-between items-center mb-6">
+                                <div>
+                                    <h2 class="font-black text-xl text-gray-800 flex items-center">
+                                        <span class="animate-pickup mr-3">🛵</span> 訂單狀態追蹤
+                                    </h2>
+                                    <p class="text-xs text-gray-400 mt-1 font-mono">ORDER #${order.id} | ${new Date(order.order_date).toLocaleString()}</p>
+                                </div>
+                                <a href="/my-orders/" class="text-base text-blue-600 font-black hover:underline underline-offset-4">查看詳情 →</a>
+                            </div>
+                            <div class="grid grid-cols-1 gap-1">${subHtml}</div>
+                        </div>`;
                     widget.classList.remove('hidden');
                 }
-            } catch (e) { console.error("Tracking Error", e); }
+            } catch (e) { console.error("訂單追蹤抓取錯誤", e); }
         }
 
-        // ✅ 修正後的 addToCart：加入穩定防重複機制
+        /**
+         * 將商品加入購物車
+         * 包含防重複點擊機制與使用者登入檢查
+         * @param {number} productId - 商品 ID
+         * @param {HTMLElement} buttonElement - 被點擊的按鈕元素
+         */
         async function addToCart(productId, buttonElement) {
+            // 權限檢查
             if (!token) { 
                 showToast("⚠️ 請先登入"); 
                 setTimeout(() => window.location.href = "/login/", 1000);
                 return; 
             }
 
-            // 1. 安全檢查：如果按鈕不存在或已被禁用則中斷
+            // 1. 安全檢查：防止在 API 處理中重複點擊
             if (!buttonElement || buttonElement.disabled) return;
 
-            // 2. 進入處理狀態
+            // 2. 進入處理狀態（禁用按鈕、改變外觀）
             buttonElement.disabled = true;
             const originalText = buttonElement.innerHTML;
             buttonElement.innerHTML = "⏳ 處理中...";
@@ -292,7 +348,7 @@
                 console.error("購物車請求失敗:", e);
                 showToast("❌ 網路連線錯誤");
             } finally {
-                // 3. 無論如何都恢復按鈕，確保下一次可以點擊
+                // 3. 恢復按鈕狀態：無論成功或失敗，都必須讓使用者能再次點擊
                 if (buttonElement) {
                     buttonElement.disabled = false;
                     buttonElement.innerHTML = originalText;
@@ -301,13 +357,19 @@
             }
         }
 
+        /**
+         * 執行登出動作：清除本地快取並重新載入頁面
+         */
         function handleLogout() { localStorage.clear(); window.location.reload(); }
 
+        // 頁面初始化載入流程
         window.onload = () => {
-            checkAuth();
-            initData();
-            fetchProducts();
-            fetchLatestOrder();
+            checkAuth();        // 檢查登入
+            initData();         // 載入分類與攤商
+            fetchProducts();    // 載入所有商品
+            fetchLatestOrder(); // 檢查是否有進行中的訂單
+            
+            // 每 30 秒自動刷新一次訂單狀態
             setInterval(fetchLatestOrder, 30000); 
         };
     </script>

@@ -3,7 +3,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.utils import timezone
 from django.db.models import Sum, F
-from django.db import transaction # ✅ 引入事務處理，確保庫存扣除安全
+from django.db import transaction # ✅ 引入事務處理，確保庫存扣除安全，避免超賣
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -20,7 +20,7 @@ from .serializers import (
     OrderItemSerializer, RegisterSerializer, SubOrderSerializer
 )
 
-# --- 頁面路由 ---
+# --- 頁面路由：負責將 Django 網址導向正確的 HTML 範本 ---
 def home_page(request): return render(request, 'index.html')
 def cart_page(request): return render(request, 'cart.html')
 def payment_page(request): return render(request, 'payment.html')
@@ -31,7 +31,9 @@ def login_page(request): return render(request, 'login.html')
 
 @method_decorator(csrf_exempt, name='dispatch')
 class RegisterView(APIView):
-    """註冊新會員 (Member 即 User)"""
+    """
+    註冊新會員：接收帳號密碼，建立 User 同時核發認證 Token
+    """
     permission_classes = [permissions.AllowAny]
     authentication_classes = [] 
 
@@ -47,20 +49,23 @@ class RegisterView(APIView):
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 class ParentOrderViewSet(viewsets.ModelViewSet):
+    """
+    父訂單 ViewSet：處理顧客查看歷史訂單以及付款後的點數回饋
+    """
     serializer_class = ParentOrderSerializer
     authentication_classes = [TokenAuthentication] 
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        # 僅回傳屬於登入者自己的訂單，並預先載入相關資料以優化效能
         return ParentOrder.objects.filter(member=self.request.user).prefetch_related('sub_orders__stall').order_by('-id')
 
-    # ✅ 新增：處理訂單付款後的自動集點邏輯
+    # ✅ Hook：處理訂單付款後的自動集點邏輯
     def perform_update(self, serializer):
-        # 取得更新前的原始狀態
+        # 取得更新前的原始狀態 (確認是否原本是 pending)
         old_status = serializer.instance.order_status
-        # 執行更新儲存
+        # 執行更新儲存 (變更狀態為 paid)
         instance = serializer.save()
         # 取得更新後的狀態
         new_status = instance.order_status
@@ -75,10 +80,11 @@ class ParentOrderViewSet(viewsets.ModelViewSet):
                 member.current_points += earned_points
                 member.save()
 
-
 @method_decorator(csrf_exempt, name='dispatch')
 class CustomLoginView(ObtainAuthToken):
-    """登入並取得 Token"""
+    """
+    登入並取得 Token：驗證帳密後回傳 API 呼叫所需的身份憑證
+    """
     authentication_classes = [] 
 
     def post(self, request, *args, **kwargs):
@@ -93,6 +99,9 @@ class CustomLoginView(ObtainAuthToken):
         })
 
 class MemberMeView(APIView):
+    """
+    個人資訊 API：回傳當前登入者的用戶名、餘額點數等
+    """
     authentication_classes = [TokenAuthentication]
     permission_classes = [permissions.IsAuthenticated]
     def get(self, request):
@@ -105,47 +114,49 @@ class MemberMeView(APIView):
 # --- 功能 ViewSets ---
 
 class StallViewSet(viewsets.ModelViewSet):
-    """包含儀表板數據統計的攤商 API"""
+    """
+    攤商 API：負責首頁攤商列表顯示以及管理端儀表板數據統計
+    """
     serializer_class = StallSerializer
     authentication_classes = [TokenAuthentication]
     parser_classes = (MultiPartParser, FormParser, JSONParser)
     
     def get_queryset(self):
-        # 區分前台與後台請求
+        # 區分請求對象：admin=true 代表管理後台，否則為前台首頁
         is_admin = self.request.query_params.get('admin', 'false') == 'true'
         if self.request.user.is_authenticated and is_admin:
             return Stall.objects.filter(owner_member=self.request.user)
         return Stall.objects.filter(is_active=True)
 
     def perform_create(self, serializer):
+        # 建立攤商時，自動將當前使用者設定為攤主
         serializer.save(owner_member=self.request.user)
 
-    # ✅ 功能 1：攤商營收報表數據
+    # ✅ 擴充功能：攤商後台數據統計 (儀表板)
     @action(detail=True, methods=['get'], permission_classes=[permissions.IsAuthenticated])
     def dashboard_stats(self, request, pk=None):
         stall = self.get_object()
         
-        # 1. 修正：明確限定必須是父訂單已付款 (paid) 的訂單才計入營收
-        # 2. 同時排除已取消的子訂單
+        # 篩選有效子訂單：必須是母訂單已付款，且子訂單未取消
         active_subs = SubOrder.objects.filter(
             stall=stall,
-            parent_order__order_status='paid', # 確保真的收到錢了
+            parent_order__order_status='paid', 
             order_status__in=['received', 'preparing', 'ready_for_pickup', 'completed']
         )
         
-        # 累計總營收 (不分日期)
+        # 累計總營收 (利用價格快照與數量計算)
         total_revenue = OrderItem.objects.filter(sub_order__in=active_subs).aggregate(
             total=Sum(F('unit_price_snapshot') * F('quantity'))
         )['total'] or 0
 
-        # 今日營收：使用 localtime 確保與台灣/本地時間同步
+        # 今日營收：計算從今日凌晨 00:00 起算至今的營收
         today_start = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
         today_revenue = OrderItem.objects.filter(
             sub_order__in=active_subs,
-            sub_order__parent_order__order_date__gte=today_start # 大於等於今天凌晨
+            sub_order__parent_order__order_date__gte=today_start 
         ).aggregate(total=Sum(F('unit_price_snapshot') * F('quantity')))['total'] or 0
 
-        # 熱銷排行
+        # 熱銷排行前 5 名
         top_products = OrderItem.objects.filter(sub_order__stall=stall, sub_order__parent_order__order_status='paid').values('product__name').annotate(
             total_qty=Sum('quantity')
         ).order_by('-total_qty')[:5]
@@ -157,9 +168,13 @@ class StallViewSet(viewsets.ModelViewSet):
         })
 
 class ProductViewSet(viewsets.ModelViewSet):
+    """
+    顧客端商品列表：自動過濾「營業中」攤商的商品，並支援分類與關鍵字搜尋
+    """
     serializer_class = ProductSerializer
     def get_queryset(self):
         now_time = timezone.localtime().time()
+        # 篩選條件：上架中 + 攤商營業中 + 符合目前當下營業時間
         queryset = Product.objects.filter(
             status='on_shelf',
             stall__is_active=True,
@@ -167,6 +182,7 @@ class ProductViewSet(viewsets.ModelViewSet):
             stall__close_time__gte=now_time
         ).select_related('stall')
         
+        # 處理分類過濾、搜尋關鍵字、特定攤商篩選
         category_id = self.request.query_params.get('category')
         if category_id: queryset = queryset.filter(category_id=category_id)
         search_query = self.request.query_params.get('search')
@@ -176,17 +192,19 @@ class ProductViewSet(viewsets.ModelViewSet):
         return queryset
 
 class StallProductManagerViewSet(viewsets.ModelViewSet):
-    """攤商後台專用的商品管理 API"""
+    """
+    攤商後台商品管理：限定攤主本人操作，支援庫存修改與上下架
+    """
     serializer_class = ProductSerializer
     authentication_classes = [TokenAuthentication]
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        # ✅ 只允許查看自己名下攤商的商品
+        # 僅允許存取自己名下的商品
         return Product.objects.filter(stall__owner_member=self.request.user)
 
     def perform_create(self, serializer):
-        # ✅ 自動找出該會員擁有的攤商，解決 "stall 必填" 報錯
+        # 新增商品時，自動綁定到攤主擁有的攤商
         stall = Stall.objects.filter(owner_member=self.request.user).first()
         if not stall:
             from rest_framework.exceptions import ValidationError
@@ -195,6 +213,7 @@ class StallProductManagerViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['patch'])
     def toggle_status(self, request, pk=None):
+        """一鍵上下架商品"""
         product = self.get_object()
         new_status = 'off_shelf' if product.status == 'on_shelf' else 'on_shelf'
         product.status = new_status
@@ -205,9 +224,10 @@ class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
 
-
 class StallOrderManagerViewSet(viewsets.ReadOnlyModelViewSet):
-    """攤商訂單管理 API"""
+    """
+    攤商後台訂單管理：僅回傳該攤商收到的子訂單，並提供狀態更新功能
+    """
     serializer_class = SubOrderSerializer
     authentication_classes = [TokenAuthentication]
     permission_classes = [permissions.IsAuthenticated]
@@ -215,23 +235,23 @@ class StallOrderManagerViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         return SubOrder.objects.filter(stall__owner_member=self.request.user).order_by('-id')
 
-    # ✅ 修正：改為接受 status 參數，不再寫死
     @action(detail=True, methods=['patch'])
     def update_status(self, request, pk=None):
+        """更新出貨/備貨狀態 (如：備貨中 -> 可取貨)"""
         sub_order = self.get_object()
         new_status = request.data.get('status')
-        
-        # 定義允許的狀態，避免資料錯誤
         allowed_status = ['received', 'ready_for_pickup', 'completed', 'cancelled']
         
         if new_status in allowed_status:
             sub_order.order_status = new_status
             sub_order.save()
             return Response({'status': sub_order.order_status})
-        
         return Response({'detail': '不支援的狀態值'}, status=400)
+
 class OrderItemViewSet(viewsets.ReadOnlyModelViewSet):
-    """支援按子訂單 ID 過濾的商品明細 API"""
+    """
+    訂單項目 API：支援透過網址參數過濾特定母訂單或子訂單的所有商品
+    """
     queryset = OrderItem.objects.all()
     serializer_class = OrderItemSerializer
     authentication_classes = [TokenAuthentication]
@@ -239,17 +259,19 @@ class OrderItemViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         parent_id = self.request.query_params.get('parent_id')
-        sub_order_id = self.request.query_params.get('sub_order_id') # ✅ 增加支援
+        sub_order_id = self.request.query_params.get('sub_order_id')
         queryset = OrderItem.objects.all()
         
         if parent_id:
             queryset = queryset.filter(sub_order__parent_order_id=parent_id)
         if sub_order_id:
-            queryset = queryset.filter(sub_order_id=sub_order_id) # ✅ 讓攤商精確抓取該筆訂單品項
-            
+            queryset = queryset.filter(sub_order_id=sub_order_id)
         return queryset
 
 class CartItemViewSet(viewsets.ModelViewSet):
+    """
+    購物車核心系統：處理加入購物車邏輯與「結帳事務處理」
+    """
     serializer_class = CartItemSerializer
     authentication_classes = [TokenAuthentication]
     permission_classes = [permissions.IsAuthenticated]
@@ -258,40 +280,46 @@ class CartItemViewSet(viewsets.ModelViewSet):
         return CartItem.objects.filter(member=self.request.user).select_related('product')
 
     def create(self, request, *args, **kwargs):
-        """覆寫建立邏輯：若商品已在購物車中，則自動累加數量，避免資料庫 Duplicate 錯誤"""
+        """
+        優化：加入購物車時，若商品已存在，則更新數量而非新增記錄
+        """
         member = request.user
         product_id = request.data.get('product')
         quantity = int(request.data.get('quantity', 1))
 
-        # 🔍 檢查是否已經存在相同的商品記錄
         cart_item = CartItem.objects.filter(member=member, product_id=product_id).first()
-
         if cart_item:
-            # 🔄 若存在：執行累加更新
             cart_item.quantity += quantity
             cart_item.save()
             serializer = self.get_serializer(cart_item)
             return Response(serializer.data, status=status.HTTP_200_OK)
         
-        # 🆕 若不存在：執行原始建立邏輯
         return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         serializer.save(member=self.request.user)
 
+    # ✅ 關鍵邏輯：購物車結帳
     @action(detail=False, methods=['post'])
     def checkout(self, request):
+        """
+        將購物車轉為訂單，涉及點數抵扣、庫存扣除、跨攤商子訂單拆分
+        """
         member = request.user
         try: use_points = int(request.data.get('use_points', 0))
         except: use_points = 0
         
+        # 1. 檢查會員點數是否足夠
         if use_points > member.current_points:
             return Response({"detail": "點數不足"}, status=400)
 
+        # 2. 開啟資料庫事務處理，確保結帳過程發生錯誤時會全數回滾，避免庫存錯亂
         with transaction.atomic():
+            # 使用 select_for_update() 鎖定記錄，防止高並發下的庫存競爭
             cart_items = CartItem.objects.select_for_update().filter(member=member)
             if not cart_items.exists(): return Response({"detail": "購物車是空的"}, status=400)
 
+            # 3. 庫存檢查與初步扣除
             total_amount = 0
             for item in cart_items:
                 if item.product.stock_quantity < item.quantity:
@@ -300,12 +328,21 @@ class CartItemViewSet(viewsets.ModelViewSet):
                 item.product.save()
                 total_amount += item.product.price * item.quantity
 
+            # 4. 計算折抵後金額並建立父訂單
             final_amount = max(0, total_amount - use_points)
-            parent_order = ParentOrder.objects.create(member=member, final_paid_amount=final_amount, payment_method='CASH', order_status='pending')
+            parent_order = ParentOrder.objects.create(
+                member=member, 
+                final_paid_amount=final_amount, 
+                payment_method='CASH', 
+                order_status='pending'
+            )
+            
+            # 5. 扣除點數
             if use_points > 0:
                 member.current_points -= use_points
                 member.save()
 
+            # 6. 按攤商拆分子訂單 (子訂單架構讓各攤商能各自管理訂單)
             stall_groups = {}
             for item in cart_items:
                 sid = item.product.stall.id
@@ -315,7 +352,14 @@ class CartItemViewSet(viewsets.ModelViewSet):
             for sid, items in stall_groups.items():
                 sub = SubOrder.objects.create(parent_order=parent_order, stall_id=sid)
                 for it in items:
-                    OrderItem.objects.create(sub_order=sub, product=it.product, unit_price_snapshot=it.product.price, quantity=it.quantity)
+                    # 儲存單價快照，避免未來商品價格變動影響已成立訂單
+                    OrderItem.objects.create(
+                        sub_order=sub, 
+                        product=it.product, 
+                        unit_price_snapshot=it.product.price, 
+                        quantity=it.quantity
+                    )
 
+            # 7. 清空購物車，事務完成
             cart_items.delete()
             return Response({"order_id": parent_order.id, "final_amount": final_amount})
